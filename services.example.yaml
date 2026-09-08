@@ -1,0 +1,8 @@
+services:
+  - name: example
+    url: https://example.com
+    timeout: 2
+
+  - name: cloudflare
+    url: https://1.1.1.1
+    timeout: 2
