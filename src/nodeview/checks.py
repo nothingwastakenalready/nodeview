@@ -1,3 +1,4 @@
+import socket
 from dataclasses import dataclass
 from time import perf_counter
 from urllib.error import HTTPError, URLError
@@ -14,9 +15,13 @@ class CheckResult:
     latency_ms: int | None
     http_status: int | None
     error: str | None = None
+    kind: str = "http"
 
 
 def check_http(service: Service) -> CheckResult:
+    if not service.url:
+        raise ValueError("http check needs a url")
+
     started = perf_counter()
     request = Request(service.url, headers={"User-Agent": "nodeview/0.1"})
 
@@ -49,4 +54,34 @@ def check_http(service: Service) -> CheckResult:
             latency_ms=None,
             http_status=None,
             error=str(getattr(exc, "reason", exc)),
+        )
+
+
+def check_tcp(service: Service) -> CheckResult:
+    if not service.host or service.port is None:
+        raise ValueError("tcp check needs a host and port")
+
+    target = f"{service.host}:{service.port}"
+    started = perf_counter()
+
+    try:
+        with socket.create_connection((service.host, service.port), timeout=service.timeout):
+            latency = round((perf_counter() - started) * 1000)
+            return CheckResult(
+                name=service.name,
+                url=target,
+                status="up",
+                latency_ms=latency,
+                http_status=None,
+                kind="tcp",
+            )
+    except (TimeoutError, OSError) as exc:
+        return CheckResult(
+            name=service.name,
+            url=target,
+            status="down",
+            latency_ms=None,
+            http_status=None,
+            error=str(exc),
+            kind="tcp",
         )
