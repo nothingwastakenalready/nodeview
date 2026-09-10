@@ -23,38 +23,18 @@ def check_http(service: Service) -> CheckResult:
         raise ValueError("http check needs a url")
 
     started = perf_counter()
-    request = Request(service.url, headers={"User-Agent": "nodeview/0.1"})
+    request = Request(service.url, headers={"User-Agent": "nodeview/0.2"})
 
     try:
         with urlopen(request, timeout=service.timeout) as response:
             latency = round((perf_counter() - started) * 1000)
             code = response.status
-            return CheckResult(
-                name=service.name,
-                url=service.url,
-                status="up" if 200 <= code < 400 else "down",
-                latency_ms=latency,
-                http_status=code,
-            )
+            return CheckResult(service.name, service.url, "up" if 200 <= code < 400 else "down", latency, code)
     except HTTPError as exc:
         latency = round((perf_counter() - started) * 1000)
-        return CheckResult(
-            name=service.name,
-            url=service.url,
-            status="down",
-            latency_ms=latency,
-            http_status=exc.code,
-            error=str(exc.reason),
-        )
+        return CheckResult(service.name, service.url, "down", latency, exc.code, str(exc.reason))
     except (URLError, TimeoutError, OSError) as exc:
-        return CheckResult(
-            name=service.name,
-            url=service.url,
-            status="down",
-            latency_ms=None,
-            http_status=None,
-            error=str(getattr(exc, "reason", exc)),
-        )
+        return CheckResult(service.name, service.url, "down", None, None, str(getattr(exc, "reason", exc)))
 
 
 def check_tcp(service: Service) -> CheckResult:
@@ -63,25 +43,17 @@ def check_tcp(service: Service) -> CheckResult:
 
     target = f"{service.host}:{service.port}"
     started = perf_counter()
-
     try:
         with socket.create_connection((service.host, service.port), timeout=service.timeout):
             latency = round((perf_counter() - started) * 1000)
-            return CheckResult(
-                name=service.name,
-                url=target,
-                status="up",
-                latency_ms=latency,
-                http_status=None,
-                kind="tcp",
-            )
+            return CheckResult(service.name, target, "up", latency, None, kind="tcp")
     except (TimeoutError, OSError) as exc:
-        return CheckResult(
-            name=service.name,
-            url=target,
-            status="down",
-            latency_ms=None,
-            http_status=None,
-            error=str(exc),
-            kind="tcp",
-        )
+        return CheckResult(service.name, target, "down", None, None, str(exc), kind="tcp")
+
+
+def check_service(service: Service) -> CheckResult:
+    if service.type == "tcp":
+        return check_tcp(service)
+    if service.type == "http":
+        return check_http(service)
+    raise ValueError(f"don't know how to check {service.type}")
