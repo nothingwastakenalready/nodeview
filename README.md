@@ -13,8 +13,8 @@ there are obviously a hundred tools that do this already. i didn't want any of t
 - up / down
 - response time
 - cli out
-
-that's basically it.
+- tiny http api
+- docker because leaving a terminal open forever is stupid
 
 ```bash
 python -m pip install -e .
@@ -22,15 +22,24 @@ cp services.example.yaml services.yaml
 nodeview services.yaml
 ```
 
-looks roughly like this:
+or leave it running:
 
-```text
-example  HTTP  UP  82ms  200
-ssh  TCP  UP  8ms
-something  TCP  DOWN  connection refused
+```bash
+cp services.example.yaml services.yaml
+docker compose up -d
 ```
 
-config is not particularly exciting either:
+by default compose only publishes the api on `127.0.0.1:8080`. there is no auth in v0.2, so exposing it to the internet would be a fairly creative decision.
+
+```text
+GET  /health
+GET  /services
+POST /check
+```
+
+`/services` runs the configured checks and returns json. `/check` does one ad-hoc http/tcp check without changing config.
+
+config is still deliberately boring:
 
 ```yaml
 services:
@@ -46,11 +55,15 @@ services:
 
 `services.yaml` is ignored on purpose. i'm eventually pointing this at things that don't need to be on github.
 
-## later
+## where this is going
 
-docker, an api, metrics and some kind of tiny web view probably.
+this stopped being just a cli experiment.
 
-not adding any of that until i actually want it.
+nodeview is heading toward a small self-hosted monitoring thing with history, a web ui, users/workspaces, hexagonal node views, dependency graphs and eventually agents.
+
+not all at once. that would be how this becomes terrible.
+
+see `docs/architecture/product-vision.md` and `docs/architecture/roadmap.md` for the longer version.
 
 ## dev
 
