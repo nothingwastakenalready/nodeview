@@ -1,7 +1,7 @@
 import argparse
 
-from .checks import CheckResult, check_http, check_tcp
-from .config import Service, load_services
+from .checks import CheckResult, check_service
+from .config import load_services
 
 
 def format_result(result: CheckResult) -> str:
@@ -20,12 +20,6 @@ def format_result(result: CheckResult) -> str:
         return "  ".join(bits)
 
     return f"{prefix}  {result.error or 'unknown error'}"
-
-
-def check_service(service: Service) -> CheckResult:
-    if service.type == "tcp":
-        return check_tcp(service)
-    return check_http(service)
 
 
 def main(argv: list[str] | None = None) -> int:
