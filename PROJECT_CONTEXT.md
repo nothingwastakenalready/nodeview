@@ -117,22 +117,11 @@ Immediate sequence:
 
 Do not jump directly to pretty topology before the monitoring state engine/history are trustworthy.
 
-## current v0.2 slice
+## current state — 2026-09-10
 
-The approved v0.2 scope is deliberately small but foundational:
+v0.2 has been implemented on main: FastAPI endpoints, shared HTTP/TCP dispatcher, Dockerfile, Compose, API tests and a Docker-build CI job are present. The next product slice after v0.2 verification is the v0.3 scheduler/state engine; write its focused design spec before implementation.
 
-- FastAPI
-- `GET /health`
-- `GET /services`
-- `POST /check`
-- shared HTTP/TCP dispatcher used by CLI and API
-- Dockerfile
-- `compose.yaml`
-- API tests
-- Python 3.11/3.12 CI
-- Docker build in CI
-
-No auth/database/scheduler/web dashboard in v0.2. v0.2 is trusted/private-network only. Compose binds to `127.0.0.1:8080` by default because there is no auth yet.
+v0.2 remains trusted/private-network only. Compose binds to `127.0.0.1:8080` by default because there is no auth yet. No database, scheduler, accounts or web dashboard belong to v0.2.
 
 ## working method
 
@@ -154,6 +143,6 @@ Keep commits human and slightly dry/understated. Avoid marketing language and fa
 - `PROJECT_CONTEXT.md` — fast handoff/current decisions
 - `docs/architecture/product-vision.md` — long-term architecture/product/security direction
 - `docs/architecture/roadmap.md` — staged development streams
-- `docs/superpowers/specs/2026-09-10-nodeview-v0.2-design.md` — current slice design
+- `docs/superpowers/specs/2026-09-10-nodeview-v0.2-design.md` — v0.2 design
 
 If a future conversation is missing context, read these files before proposing architecture changes.
