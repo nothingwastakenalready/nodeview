@@ -102,3 +102,23 @@ def test_lifespan_starts_and_stops_injected_engine(tmp_path):
         assert client.get("/state").json() == []
 
     assert engine.stopped is True
+
+
+def test_serves_built_ui_from_supplied_directory(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    ui = tmp_path / "dist"
+    assets = ui / "assets"
+    assets.mkdir(parents=True)
+    (ui / "index.html").write_text("<html><body>nodeview ui</body></html>")
+    (assets / "app.js").write_text("console.log('nodeview')")
+
+    client = TestClient(create_app(config_path=config, ui_path=ui))
+
+    root = client.get("/")
+    asset = client.get("/assets/app.js")
+
+    assert root.status_code == 200
+    assert "nodeview ui" in root.text
+    assert asset.status_code == 200
+    assert "nodeview" in asset.text
