@@ -16,22 +16,35 @@ there are obviously a hundred tools that do this already. i didn't want any of t
 - always-on scheduler
 - current state with `pending / up / warning / critical / unknown`
 - failure/recovery thresholds so one bad sample does not immediately become the apocalypse
+- first browser ui with a compact hexagon overview and current latency
 - docker because leaving a terminal open forever is stupid
 
-```bash
-python -m pip install -e .
-cp services.example.yaml services.yaml
-nodeview services.yaml
-```
+## run it locally
 
-or leave it running:
+You only need Git and Docker Desktop (or Docker Engine + Compose).
 
 ```bash
+git clone https://github.com/nothingwastakenalready/nodeview.git
+cd nodeview
 cp services.example.yaml services.yaml
-docker compose up -d
+docker compose up -d --build
 ```
 
-by default compose only publishes the api on `127.0.0.1:8080`. there is still no auth, so exposing it to the internet would be a fairly creative decision.
+Then open:
+
+```text
+http://127.0.0.1:8080
+```
+
+The same process serves the API, scheduler and built UI. Compose still binds only to localhost by default. There is no auth yet, so changing that to a public bind would be a fairly creative decision.
+
+Change `services.yaml` to point at things you actually run, then restart:
+
+```bash
+docker compose restart
+```
+
+API is still there:
 
 ```text
 GET  /health
@@ -63,23 +76,41 @@ monitoring fields are optional. defaults are 30s interval, two failures before c
 
 `services.yaml` is ignored on purpose. i'm eventually pointing this at things that don't need to be on github.
 
+## ui dev
+
+The first UI is deliberately small and easy to change. Run the API on `127.0.0.1:8080`, then:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Vite proxies the NodeView API during development. The production Docker image builds the frontend and serves it from FastAPI, so there is no second service to operate.
+
+The current screen uses services as overview tiles because the real node/workspace model does not exist yet. That is temporary and documented in `docs/architecture/ui.md`.
+
 ## where this is going
 
 this stopped being just a cli experiment.
 
-nodeview is heading toward a small self-hosted monitoring thing with history, a web ui, users/workspaces, hexagonal node views, dependency graphs and eventually agents.
+nodeview is heading toward a small self-hosted monitoring thing with history, users/workspaces, a proper node model, dependency graphs and eventually agents.
 
 not all at once. that would be how this becomes terrible.
 
-next useful problem: persistence and history. current state disappearing on restart is fine for 0.3 and not fine forever.
+next useful backend problem: persistence and history. current state disappearing on restart is fine for 0.3 and not fine forever.
 
-see `docs/architecture/product-vision.md` and `docs/architecture/roadmap.md` for the longer version.
+see `docs/architecture/product-vision.md`, `docs/architecture/roadmap.md` and `docs/architecture/ui.md` for the longer version.
 
 ## dev
 
 ```bash
 python -m pip install -e '.[test]'
 pytest
+
+cd web
+npm test
+npm run build
 ```
 
 python 3.11+.
