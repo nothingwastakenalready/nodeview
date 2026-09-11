@@ -6,9 +6,37 @@ This is the current design handoff for the browser interface.
 
 NodeView should look like a real internal infrastructure tool, not a landing page and not a generic admin template.
 
+NodeView is not a Checkmk clone.
+
+Checkmk is only one reference for dense operational scanning and host/service status semantics. The visual language should draw more broadly from monitoring, observability, infrastructure visualizers and modern technical tools.
+
+Useful references by category:
+
+- Checkmk: dense status scanning, host/service mental model, operational seriousness
+- Uptime Kuma / Gatus: low-friction uptime monitoring, clear service states, simple setup
+- Beszel / Netdata: lightweight host telemetry, calm server-health dashboards, hub + agent direction
+- Grafana / Datadog / New Relic: dashboards, time-series reading, filtering, drill-down, incident context
+- Honeycomb / SigNoz-style observability tools: event-first investigation, high-cardinality exploration, trace-like navigation ideas later
+- Docker and infrastructure visualizers: live topology, container/network relationships, object maps
+- Linear / Vercel / Raycast / modern developer tools: restrained dark UI, sharp typography, command-oriented polish, low visual noise
+
+The goal is a distinct NodeView identity: technical, restrained, fast to read, slightly opinionated, and not visually owned by any one existing product.
+
+## design principles
+
+1. status first, decoration second
+2. latency is not a secondary footnote
+3. topology is explanatory, not ornamental
+4. overview is for orientation; detail is for thinking
+5. never use fake data just to make the UI look fuller
+6. do not copy another product's layout, colors or component shapes one-to-one
+7. keep the interface calm until something actually needs attention
+
+## density model
+
 The interface mixes two densities:
 
-- **overview:** compact and operational, closer to Checkmk in how much can be scanned at once
+- **overview:** compact and operational, enough objects visible to scan quickly
 - **detail:** more spacious and modern, with room for latency/history and later telemetry
 
 The rule is simple: dense where operators need orientation, quiet where they need analysis.
@@ -23,7 +51,7 @@ The current implementation only ships the overview plus a lightweight selected-m
 
 ## overview
 
-The primary visual motif is a field of hexagonal status tiles.
+The primary visual motif is a field of hexagonal status tiles for now, but the hexagon is not sacred. It is a current motif, not a prison.
 
 Each tile currently shows:
 
@@ -36,6 +64,8 @@ The inside remains dark. Status lives mostly on the perimeter so a large grid do
 
 Target desktop density is roughly 15–25 useful tiles on a 1440p display once the real node model exists. Do not cram CPU, RAM, uptime, service counts and every secondary metric into the overview tile.
 
+If another visual primitive later communicates state better than hexagons, it can replace them. The product requirement is fast state recognition, not geometric loyalty.
+
 ## status semantics
 
 - healthy — green
@@ -43,6 +73,7 @@ Target desktop density is roughly 15–25 useful tiles on a 1440p display once t
 - critical — red
 - unknown — grey
 - pending — blue
+- affected — later topology-derived downstream impact, visually distinct from direct critical failure
 
 Exact color values are not sacred yet. Semantics are.
 
@@ -64,6 +95,8 @@ Future node detail is expected to have:
 
 Time-series charts get real space instead of being squeezed into cards for dashboard aesthetics.
 
+Charts should be readable before they are pretty. Borrow from Grafana/Datadog/New Relic only at the pattern level: clear axes, useful ranges, good drill-down, obvious correlation. Do not build a generic dashboard-builder clone.
+
 ## topology direction
 
 The later topology screen sits between overview and detail in density.
@@ -76,6 +109,8 @@ It should show real dependencies, not decorative lines. Expected semantics:
 - downstream impact as `affected` when appropriate
 
 Never imply proven root cause when the system only knows dependency relationships.
+
+Topology should feel more like an infrastructure map than a cyberpunk poster. Lines should explain paths, blast radius and probable impact. Animation is useful only if it reveals freshness or flow.
 
 ## current implementation limitation
 
@@ -93,14 +128,16 @@ The overview should migrate from service tiles to node tiles once that backend m
 
 - dark neutral background, not pure black
 - restrained borders and surfaces
+- avoid copying Checkmk's exact palette, density, iconography or spacing
 - no gratuitous gradients
-- no cyberpunk/neon treatment
+- no cyberpunk/neon treatment as the default identity
 - no fake terminal styling
 - no glassmorphism just because it exists
 - no giant marketing headlines inside the product
 - numbers get stronger visual weight than metadata
 - typography stays clean, small and technical
 - motion stays subtle and respects reduced-motion preferences
+- accents can be sharper and more ownable than today, but must support state clarity
 
 ## copy
 
@@ -143,5 +180,6 @@ Design iteration can change spacing, typography, exact colors, hexagon geometry,
 - detail is calmer than overview
 - no fake metrics are introduced
 - current service-as-tile representation is understood as temporary
+- the result feels like NodeView, not Checkmk wearing different CSS
 
 Before adding topology or historical charts, wait until the corresponding backend data is real.
