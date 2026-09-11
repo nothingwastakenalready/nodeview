@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Callable
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, model_validator
 
 from .checks import CheckResult, check_service
@@ -49,9 +51,11 @@ def create_app(
     checker: Checker = check_service,
     engine: MonitoringEngine | None = None,
     monitor: bool = False,
+    ui_path: str | Path | None = None,
 ) -> FastAPI:
     path = Path(config_path or os.environ.get("NODEVIEW_CONFIG", "/config/services.yaml"))
     runtime_engine = engine
+    ui_root = Path(ui_path or os.environ.get("NODEVIEW_UI", "/app/web/dist"))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -86,6 +90,16 @@ def create_app(
         if runtime_engine is None:
             return []
         return [asdict(item) for item in runtime_engine.states().values()]
+
+    assets = ui_root / "assets"
+    index = ui_root / "index.html"
+    if assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+    if index.is_file():
+        @app.get("/", include_in_schema=False)
+        def ui_index():
+            return FileResponse(index)
 
     return app
 
