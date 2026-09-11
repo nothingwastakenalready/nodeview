@@ -16,28 +16,50 @@ The long-term product is multi-user and workspace-based, with a browser UI and l
 
 ## visual/product decisions already made
 
-- primary infrastructure overview: hexagonal nodes
+- NodeView must not become a Checkmk clone
+- Checkmk is only one reference for dense operational scanning and host/service status semantics
+- broader visual inspiration should also come from Uptime Kuma, Gatus, Beszel, Netdata, Grafana, Datadog, New Relic, Honeycomb/SigNoz-style observability tools, Docker/infrastructure visualizers and modern developer tools like Linear/Vercel/Raycast
+- primary infrastructure overview currently uses hexagonal tiles, but the hexagon is a motif, not a permanent constraint
 - dark/restrained interface
 - density model: overview is compact, topology medium-density, detail spacious
-- monitoring color spectrum: healthy / warning / critical / unknown / pending
-- similar semantic spectrum to Checkmk is fine; do not copy Checkmk UI one-to-one
-- dark tile interiors with stronger status perimeter/ring are preferred over fully saturated tiles
+- monitoring color spectrum: healthy / warning / critical / unknown / pending, with later `affected` for topology-derived downstream impact
+- do not copy any product's exact layout, colors, icons, spacing or component shapes one-to-one
+- dark tile interiors with stronger status perimeter/ring are currently preferred over fully saturated tiles
 - status must remain understandable without color alone
 - current health and latency should be visible at a glance
 - latency is a first-class metric and gets history graphs once persistence exists
 - node detail later includes services, events, uptime, latency history and agent telemetry
 - dependency/topology graph is a core future feature
 - dependency state can mark downstream systems `affected`; do not claim causal certainty
-- UI should feel like a real internal infrastructure tool, not a landing page, fake terminal or generic admin template
+- UI should feel like a real internal infrastructure tool, not a landing page, fake terminal, cyberpunk poster or generic admin template
 - repo/UI copy stays short, dry and functional
+
+## UI identity target
+
+NodeView should feel technical, restrained, fast to read, slightly opinionated and self-hosted-native.
+
+The first UI shell is allowed to be imperfect. Its job is to make the running monitor visible. Future UI work should create a distinct NodeView design language rather than polishing the current shell into a Checkmk-adjacent clone.
+
+Core UI principles:
+
+1. status first, decoration second
+2. latency is not a secondary footnote
+3. topology is explanatory, not ornamental
+4. overview is for orientation; detail is for thinking
+5. never use fake data just to make the UI look fuller
+6. keep the interface calm until something actually needs attention
 
 ## reference products
 
 - Checkmk: host/service model, dense state overview, status semantics
-- Uptime Kuma: low-friction onboarding/self-hosting
-- Prometheus: time-series/metrics interoperability, not something to clone
-- Gatus: simple active-check/threshold mental model
-- Beszel/Netdata: hub + agent and host telemetry direction
+- Uptime Kuma: low-friction onboarding/self-hosting, clear uptime status feel
+- Gatus: simple active-check/threshold mental model, config-as-code health checks
+- Beszel/Netdata: lightweight host telemetry, calm server-health dashboards, hub + agent direction
+- Grafana: time-series/dashboard reading patterns and composable visual panels, not a thing to clone
+- Datadog/New Relic: drill-down, incident context, correlation and dashboard interaction patterns
+- Honeycomb/SigNoz-style tools: event-first investigation and later observability navigation ideas
+- Docker/infrastructure visualizers: live topology and object relationship maps
+- Linear/Vercel/Raycast-style developer tools: restrained modern technical polish and low visual noise
 
 NodeView should combine useful ideas without becoming a clone of any of them.
 
@@ -125,7 +147,7 @@ Immediate sequence:
 4. v0.4 persistence/history/latency — next major backend slice
 5. proper node/workspace model + richer web UI
 6. accounts/workspaces/tenant isolation
-7. real hexagonal node overview
+7. real node overview with its own visual language
 8. dependency graph
 9. agent
 10. alerting/operations
@@ -179,7 +201,7 @@ The next major backend slice is v0.4: persistence + history. It should introduce
 
 ## local inspection
 
-Once the UI-shell commit is on `main`, the intended local flow is:
+The intended local flow is:
 
 ```bash
 git clone https://github.com/nothingwastakenalready/nodeview.git
