@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
 from typing import Callable
@@ -8,6 +9,7 @@ from pydantic import BaseModel, model_validator
 
 from .checks import CheckResult, check_service
 from .config import Service, load_services
+from .engine import MonitoringEngine
 
 Checker = Callable[[Service], CheckResult]
 
@@ -42,9 +44,30 @@ def result_json(result: CheckResult) -> dict:
     return data
 
 
-def create_app(config_path: str | Path | None = None, checker: Checker = check_service) -> FastAPI:
+def create_app(
+    config_path: str | Path | None = None,
+    checker: Checker = check_service,
+    engine: MonitoringEngine | None = None,
+    monitor: bool = False,
+) -> FastAPI:
     path = Path(config_path or os.environ.get("NODEVIEW_CONFIG", "/config/services.yaml"))
-    app = FastAPI(title="nodeview", version="0.2.0")
+    runtime_engine = engine
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        nonlocal runtime_engine
+        if runtime_engine is None and monitor:
+            runtime_engine = MonitoringEngine(load_services(path), checker=checker)
+        app.state.engine = runtime_engine
+        if runtime_engine is not None:
+            await runtime_engine.start()
+        try:
+            yield
+        finally:
+            if runtime_engine is not None:
+                await runtime_engine.stop()
+
+    app = FastAPI(title="nodeview", version="0.3.0", lifespan=lifespan)
 
     @app.get("/health")
     def health():
@@ -58,7 +81,13 @@ def create_app(config_path: str | Path | None = None, checker: Checker = check_s
     def check(service: ServiceInput):
         return result_json(checker(service.service()))
 
+    @app.get("/state")
+    def state():
+        if runtime_engine is None:
+            return []
+        return [asdict(item) for item in runtime_engine.states().values()]
+
     return app
 
 
-app = create_app()
+app = create_app(monitor=True)
