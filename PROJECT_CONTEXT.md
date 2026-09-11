@@ -12,20 +12,24 @@ The product should answer quickly:
 2. what is getting worse?
 3. what is probably causing it?
 
-The long-term product is multi-user and workspace-based, with a web UI and later a desktop client and remote agents.
+The long-term product is multi-user and workspace-based, with a browser UI and later a desktop client and remote agents.
 
 ## visual/product decisions already made
 
 - primary infrastructure overview: hexagonal nodes
 - dark/restrained interface
+- density model: overview is compact, topology medium-density, detail spacious
 - monitoring color spectrum: healthy / warning / critical / unknown / pending
 - similar semantic spectrum to Checkmk is fine; do not copy Checkmk UI one-to-one
-- each node should show current health and latency at a glance
-- latency is a first-class metric and gets history graphs
+- dark tile interiors with stronger status perimeter/ring are preferred over fully saturated tiles
+- status must remain understandable without color alone
+- current health and latency should be visible at a glance
+- latency is a first-class metric and gets history graphs once persistence exists
 - node detail later includes services, events, uptime, latency history and agent telemetry
 - dependency/topology graph is a core future feature
 - dependency state can mark downstream systems `affected`; do not claim causal certainty
-- status must remain understandable without color alone
+- UI should feel like a real internal infrastructure tool, not a landing page, fake terminal or generic admin template
+- repo/UI copy stays short, dry and functional
 
 ## reference products
 
@@ -46,6 +50,8 @@ user -> membership -> workspace -> nodes -> services -> checks -> measurements/e
 Dependencies connect nodes/services. All tenant-owned data belongs to exactly one workspace. Roles are initially owner/admin/member/viewer.
 
 Multi-user is planned early enough that tenant isolation does not become a retrofit across the whole codebase.
+
+Important current UI limitation: v0.3 does not yet have the final node/workspace model, so the first browser UI temporarily renders each monitored service as one overview hexagon. Do not build product logic around that shortcut. Migrate overview tiles to real nodes once the backend model exists.
 
 ## security decisions
 
@@ -72,10 +78,9 @@ Before a serious public release: threat model, security review/pentest, security
 
 ## technology direction
 
-Current backend remains Python 3.11+.
+Backend:
 
-Direction:
-
+- Python 3.11+
 - FastAPI API
 - asyncio in-process scheduler for the current single-server architecture
 - synchronous protocol checks executed through `asyncio.to_thread()` so they do not block the event loop
@@ -86,11 +91,19 @@ Direction:
 - pytest / TDD for behavior changes
 - Docker Compose first-class deployment
 
+Frontend now exists as a deliberately small shell:
+
+- React 19.3
+- TypeScript
+- Vite 8.x
+- Vitest 5
+- plain CSS for now
+- same-origin production deployment: frontend is compiled in Docker and served by FastAPI
+- local design iteration can use the Vite dev server with API proxying
+- no component framework yet because the visual language is still expected to evolve in Codex
+
 Frontend later:
 
-- TypeScript
-- React
-- Vite
 - dedicated chart library for time series
 - topology graph library chosen only after interaction requirements are specified
 
@@ -108,24 +121,25 @@ Immediate sequence:
 
 1. v0.2 always-on API + Docker — implemented
 2. v0.3 scheduler/state engine — implemented
-3. v0.4 persistence/history/latency — next
-4. v0.5 first real web UI
-5. v0.6 accounts/workspaces/tenant isolation
-6. v0.7 hexagonal node view
-7. v0.8 dependency graph
-8. v0.9 agent
-9. alerting/operations
-10. Prometheus/interoperability
-11. desktop client
-12. 1.0 open-source hardening/release quality
+3. first browser UI shell — implemented after v0.3, intentionally before persistence so the project can be inspected locally
+4. v0.4 persistence/history/latency — next major backend slice
+5. proper node/workspace model + richer web UI
+6. accounts/workspaces/tenant isolation
+7. real hexagonal node overview
+8. dependency graph
+9. agent
+10. alerting/operations
+11. Prometheus/interoperability
+12. desktop client
+13. 1.0 open-source hardening/release quality
 
-Do not jump directly to pretty topology before the monitoring state engine/history are trustworthy.
+Do not jump directly to pretty topology before the monitoring state engine/history and real dependency data are trustworthy.
 
 ## current state — 2026-09-11
 
-v0.3 adds the first actual monitoring engine.
+v0.3 added the first actual monitoring engine.
 
-Implemented behavior:
+Implemented backend behavior:
 
 - existing HTTP/TCP checks remain the protocol core
 - each configured service can define `interval`, `failure_threshold`, and `success_threshold`
@@ -140,15 +154,43 @@ Implemented behavior:
 - each service has an asyncio scheduling loop
 - synchronous checks run via `asyncio.to_thread()`
 - a shared semaphore bounds concurrent checks; default max concurrency is 10
-- engine start is idempotent enough to avoid duplicate service loops
+- engine start avoids duplicate service loops
 - engine stop cancels and awaits scheduler tasks cleanly
 - FastAPI lifespan starts/stops the default engine
 - `GET /state` exposes the current in-memory state
-- `/health`, `/services`, and `/check` keep their v0.2 meanings
+- `/health`, `/services`, and `/check` keep their earlier meanings
 
-State is intentionally in-memory in v0.3. Restarting NodeView resets state to pending. There is no measurement history, uptime calculation, database, alerting, auth, or UI yet.
+First browser UI shell:
 
-The next slice is v0.4: persistence + history. It should introduce a proper persistence boundary, migrations, measurements/state-change events, latency history, retention policy, and time-range APIs without turning NodeView into a general-purpose TSDB.
+- compact dark dashboard
+- summary counts for healthy/warning/critical/unknown/pending
+- hexagonal overview tiles showing service name, current latency and readable status
+- selected-service detail with last check, HTTP status, streak counters and last error
+- 5-second `/state` refresh
+- loading, empty, stale/error states
+- accessible button semantics, focus state and reduced-motion support
+- frontend unit/render tests in CI
+- production frontend compiled through a Node Docker stage and served from the same FastAPI container
+- Compose remains a single service and localhost-only by default
+
+State is still intentionally in-memory. Restarting NodeView resets state to pending. There is no measurement history, uptime calculation, database, alerting, authentication, final node/workspace model or dependency topology yet.
+
+The next major backend slice is v0.4: persistence + history. It should introduce a proper persistence boundary, migrations, measurements/state-change events, latency history, retention policy, and time-range APIs without turning NodeView into a general-purpose TSDB.
+
+## local inspection
+
+Once the UI-shell commit is on `main`, the intended local flow is:
+
+```bash
+git clone https://github.com/nothingwastakenalready/nodeview.git
+cd nodeview
+cp services.example.yaml services.yaml
+docker compose up -d --build
+```
+
+Open `http://127.0.0.1:8080`.
+
+For UI iteration in Codex/local dev, run the backend on port 8080 and then `cd web && npm install && npm run dev`.
 
 ## working method
 
@@ -170,8 +212,11 @@ Keep commits human and slightly dry/understated. Avoid marketing language and fa
 - `PROJECT_CONTEXT.md` — fast handoff/current decisions
 - `docs/architecture/product-vision.md` — long-term architecture/product/security direction
 - `docs/architecture/roadmap.md` — staged development streams
+- `docs/architecture/ui.md` — current UI direction and Codex handoff
 - `docs/superpowers/specs/2026-09-10-nodeview-v0.2-design.md` — v0.2 design
 - `docs/superpowers/specs/2026-09-11-nodeview-v0.3-design.md` — scheduler/state-engine design
 - `docs/superpowers/plans/2026-09-11-nodeview-v0.3.md` — v0.3 implementation plan
+- `docs/superpowers/specs/2026-09-11-nodeview-ui-shell-design.md` — first browser UI shell design
+- `docs/superpowers/plans/2026-09-11-nodeview-ui-shell.md` — UI shell implementation plan
 
 If a future conversation is missing context, read these files before proposing architecture changes.
