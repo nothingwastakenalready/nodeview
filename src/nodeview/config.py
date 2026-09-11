@@ -12,6 +12,9 @@ class Service:
     type: str = "http"
     host: str | None = None
     port: int | None = None
+    interval: float = 30.0
+    failure_threshold: int = 2
+    success_threshold: int = 1
 
 
 def load_services(path: str | Path) -> list[Service]:
@@ -27,24 +30,35 @@ def load_services(path: str | Path) -> list[Service]:
 
         kind = str(item.get("type", "http")).lower()
         timeout = float(item.get("timeout", 2.0))
+        interval = float(item.get("interval", 30.0))
+        failure_threshold = int(item.get("failure_threshold", 2))
+        success_threshold = int(item.get("success_threshold", 1))
+
+        if interval <= 0:
+            raise ValueError("interval must be greater than zero")
+        if failure_threshold < 1:
+            raise ValueError("failure_threshold must be at least one")
+        if success_threshold < 1:
+            raise ValueError("success_threshold must be at least one")
+
+        common = {
+            "name": str(item["name"]),
+            "timeout": timeout,
+            "type": kind,
+            "interval": interval,
+            "failure_threshold": failure_threshold,
+            "success_threshold": success_threshold,
+        }
 
         if kind == "http":
             if not item.get("url"):
                 raise ValueError("http services need a url")
-            services.append(
-                Service(name=str(item["name"]), url=str(item["url"]), timeout=timeout, type="http")
-            )
+            services.append(Service(url=str(item["url"]), **common))
         elif kind == "tcp":
             if not item.get("host") or item.get("port") is None:
                 raise ValueError("tcp services need a host and port")
             services.append(
-                Service(
-                    name=str(item["name"]),
-                    timeout=timeout,
-                    type="tcp",
-                    host=str(item["host"]),
-                    port=int(item["port"]),
-                )
+                Service(host=str(item["host"]), port=int(item["port"]), **common)
             )
         else:
             raise ValueError(f"don't know how to check {kind}")
