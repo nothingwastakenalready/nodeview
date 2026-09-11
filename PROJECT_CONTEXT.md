@@ -66,6 +66,8 @@ Important boundaries:
 - secrets must not appear in examples/logs/public APIs
 - desktop credentials eventually use OS credential storage
 
+Continuous scheduling increases the importance of SSRF/egress controls because configured targets are contacted repeatedly. Until target-policy hardening and auth/tenant isolation exist, NodeView remains trusted/self-hosted and should not be exposed to untrusted users.
+
 Before a serious public release: threat model, security review/pentest, security regression tests, dependency/static/secret/container scanning, SECURITY.md, private vulnerability reporting path, OpenSSF review. An independent human review is still desirable before a security-sensitive 1.0.
 
 ## technology direction
@@ -75,6 +77,8 @@ Current backend remains Python 3.11+.
 Direction:
 
 - FastAPI API
+- asyncio in-process scheduler for the current single-server architecture
+- synchronous protocol checks executed through `asyncio.to_thread()` so they do not block the event loop
 - Pydantic at boundaries
 - SQLAlchemy + Alembic once persistence arrives
 - SQLite for easy small/development installs where appropriate
@@ -102,9 +106,9 @@ Detailed roadmap: `docs/architecture/roadmap.md`.
 
 Immediate sequence:
 
-1. v0.2 always-on API + Docker
-2. v0.3 scheduler/state engine
-3. v0.4 persistence/history/latency
+1. v0.2 always-on API + Docker — implemented
+2. v0.3 scheduler/state engine — implemented
+3. v0.4 persistence/history/latency — next
 4. v0.5 first real web UI
 5. v0.6 accounts/workspaces/tenant isolation
 6. v0.7 hexagonal node view
@@ -117,11 +121,34 @@ Immediate sequence:
 
 Do not jump directly to pretty topology before the monitoring state engine/history are trustworthy.
 
-## current state — 2026-09-10
+## current state — 2026-09-11
 
-v0.2 has been implemented on main: FastAPI endpoints, shared HTTP/TCP dispatcher, Dockerfile, Compose, API tests and a Docker-build CI job are present. The next product slice after v0.2 verification is the v0.3 scheduler/state engine; write its focused design spec before implementation.
+v0.3 adds the first actual monitoring engine.
 
-v0.2 remains trusted/private-network only. Compose binds to `127.0.0.1:8080` by default because there is no auth yet. No database, scheduler, accounts or web dashboard belong to v0.2.
+Implemented behavior:
+
+- existing HTTP/TCP checks remain the protocol core
+- each configured service can define `interval`, `failure_threshold`, and `success_threshold`
+- defaults: 30 second interval, 2 failures to become critical, 1 success to recover
+- services start in `pending`
+- successful checks become `up`
+- failures before the configured failure threshold become `warning`
+- threshold-reaching failures become `critical`
+- unexpected checker/engine exceptions become `unknown` instead of killing the scheduler
+- recovery can require multiple consecutive successes
+- success/failure counters reset each other
+- each service has an asyncio scheduling loop
+- synchronous checks run via `asyncio.to_thread()`
+- a shared semaphore bounds concurrent checks; default max concurrency is 10
+- engine start is idempotent enough to avoid duplicate service loops
+- engine stop cancels and awaits scheduler tasks cleanly
+- FastAPI lifespan starts/stops the default engine
+- `GET /state` exposes the current in-memory state
+- `/health`, `/services`, and `/check` keep their v0.2 meanings
+
+State is intentionally in-memory in v0.3. Restarting NodeView resets state to pending. There is no measurement history, uptime calculation, database, alerting, auth, or UI yet.
+
+The next slice is v0.4: persistence + history. It should introduce a proper persistence boundary, migrations, measurements/state-change events, latency history, retention policy, and time-range APIs without turning NodeView into a general-purpose TSDB.
 
 ## working method
 
@@ -144,5 +171,7 @@ Keep commits human and slightly dry/understated. Avoid marketing language and fa
 - `docs/architecture/product-vision.md` — long-term architecture/product/security direction
 - `docs/architecture/roadmap.md` — staged development streams
 - `docs/superpowers/specs/2026-09-10-nodeview-v0.2-design.md` — v0.2 design
+- `docs/superpowers/specs/2026-09-11-nodeview-v0.3-design.md` — scheduler/state-engine design
+- `docs/superpowers/plans/2026-09-11-nodeview-v0.3.md` — v0.3 implementation plan
 
 If a future conversation is missing context, read these files before proposing architecture changes.
