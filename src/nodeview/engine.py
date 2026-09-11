@@ -1,8 +1,12 @@
+import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timezone
 
-from .checks import CheckResult
+from .checks import CheckResult, check_service
 from .config import Service
+
+Checker = Callable[[Service], CheckResult]
 
 
 @dataclass(frozen=True)
@@ -71,3 +75,61 @@ def apply_error(
         consecutive_successes=0,
         consecutive_failures=0,
     )
+
+
+class MonitoringEngine:
+    def __init__(
+        self,
+        services: list[Service],
+        checker: Checker = check_service,
+        max_concurrency: int = 10,
+    ) -> None:
+        if max_concurrency < 1:
+            raise ValueError("max_concurrency must be at least one")
+        self._services = list(services)
+        self._checker = checker
+        self._states = {service.name: initial_state(service) for service in services}
+        self._semaphore = asyncio.Semaphore(max_concurrency)
+        self._tasks: dict[str, asyncio.Task[None]] = {}
+
+    def states(self) -> dict[str, ServiceState]:
+        return dict(self._states)
+
+    async def run_once(self, service: Service) -> ServiceState:
+        previous = self._states[service.name]
+        checked_at = datetime.now(timezone.utc)
+
+        try:
+            async with self._semaphore:
+                result = await asyncio.to_thread(self._checker, service)
+        except Exception as exc:
+            state = apply_error(previous, service, exc, checked_at)
+        else:
+            state = apply_result(previous, result, service, checked_at)
+
+        self._states[service.name] = state
+        return state
+
+    async def start(self) -> None:
+        if self._tasks:
+            return
+
+        self._tasks = {
+            service.name: asyncio.create_task(self._run_service(service), name=f"nodeview:{service.name}")
+            for service in self._services
+        }
+
+    async def stop(self) -> None:
+        if not self._tasks:
+            return
+
+        tasks = list(self._tasks.values())
+        self._tasks = {}
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _run_service(self, service: Service) -> None:
+        while True:
+            await self.run_once(service)
+            await asyncio.sleep(service.interval)
