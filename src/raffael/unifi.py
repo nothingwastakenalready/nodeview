@@ -11,7 +11,7 @@ import os
 import ssl
 from http.cookiejar import CookieJar
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 from urllib.request import HTTPCookieProcessor, HTTPSHandler, Request, build_opener
 
 from .client_sources import ClientSourceError, ImportedClient, clean_mac, clean_text
@@ -135,7 +135,25 @@ def fetch_local_integration_clients(opener, base_url: str, site: str, api_key: s
     site_id = clean_text(match.get("id")) or clean_text(match.get("internalReference"))
     if not site_id:
         raise UniFiImportError("unifi local API returned no site id")
-    return get_json(opener, base_url, f"/proxy/network/integration/v1/sites/{site_id}/clients", api_key=api_key)
+    rows: list[dict] = []
+    offset = 0
+    limit = 100
+    while True:
+        payload = get_json(
+            opener,
+            base_url,
+            f"/proxy/network/integration/v1/sites/{site_id}/clients?{urlencode({'offset': offset, 'limit': limit})}",
+            api_key=api_key,
+        )
+        page = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(page, list):
+            raise UniFiImportError("unifi local API returned invalid clients")
+        rows.extend(row for row in page if isinstance(row, dict))
+        total = payload.get("totalCount") or payload.get("total")
+        if not page or (isinstance(total, int) and len(rows) >= total) or len(page) < limit:
+            break
+        offset += len(page)
+    return {"data": rows}
 
 
 def request_json(opener, base_url: str, path: str, payload: dict) -> dict:
