@@ -65,6 +65,23 @@ function topologyTemplate(nodes: HouseholdDevice[]): { name: string; positions: 
   nodes.forEach((node) => { if (node.parent_id !== null) degrees.set(node.parent_id, (degrees.get(node.parent_id) ?? 0) + 1); });
   const root = nodes.find((node) => node.parent_id === null) ?? nodes[0];
   const hubDegree = root ? degrees.get(root.id) ?? 0 : 0;
+  if (root && hubDegree >= 4 && nodes.length > 8) {
+    const positions = new Map<string, Point>([[root.name, { x: 50, y: 50 }]]);
+    const children = nodes.filter((node) => node.parent_id === root.id);
+    children.forEach((node, index) => {
+      const angle = -Math.PI / 2 + (index / Math.max(1, children.length)) * Math.PI * 2;
+      positions.set(node.name, { x: 50 + Math.cos(angle) * 31, y: 50 + Math.sin(angle) * 31 });
+      nodes.filter((candidate) => candidate.parent_id === node.id).forEach((satellite, satelliteIndex, satellites) => {
+        const satelliteAngle = angle + (satelliteIndex - (satellites.length - 1) / 2) * 0.35;
+        positions.set(satellite.name, { x: 50 + Math.cos(satelliteAngle) * 43, y: 50 + Math.sin(satelliteAngle) * 43 });
+      });
+    });
+    nodes.filter((node) => !positions.has(node.name)).forEach((node, index, remaining) => {
+      const angle = (index / Math.max(1, remaining.length)) * Math.PI * 2;
+      positions.set(node.name, { x: 50 + Math.cos(angle) * 20, y: 50 + Math.sin(angle) * 20 });
+    });
+    return { name: "Raffael-Zentralstern", positions };
+  }
   const family = hubDegree >= 4 ? "hub" : nodes.length >= 8 ? "cross" : "chain";
   const candidates = CONSTELLATION_TEMPLATES.filter((item) => item.family === family && item.minimum <= nodes.length);
   const fingerprint = nodes.reduce((sum, node) => sum + node.name.split("").reduce((value, char) => value + char.charCodeAt(0), 0), 0);
