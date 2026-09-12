@@ -128,3 +128,6 @@ npm run build
 ```
 
 python 3.11+.
+
+Before deploying, run `scripts/pre-deploy-check.sh` and follow
+`docs/deployment.md`.
