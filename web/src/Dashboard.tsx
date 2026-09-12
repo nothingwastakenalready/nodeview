@@ -52,6 +52,9 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
   const [showAddClient, setShowAddClient] = useState(false);
+  const [showDiscover, setShowDiscover] = useState(false);
+  const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
+  const [discovered, setDiscovered] = useState<Array<{ address: string; hostname: string | null; open_ports: number[] }>>([]);
   const [addClientMessage, setAddClientMessage] = useState<string | null>(null);
   const draggedRef = useRef(false);
 
@@ -106,6 +109,17 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     event.currentTarget.reset();
   }
 
+  async function discover(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
+    const response = await fetch("/household/discover", { method: "POST", headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}) }, body: JSON.stringify({ network: form.get("network"), workers: 32 }) });
+    if (!response.ok) { setDiscoveryMessage("discovery failed"); return; }
+    const results = await response.json() as Array<{ address: string; hostname: string | null; open_ports: number[] }>;
+    setDiscovered(results);
+    setDiscoveryMessage(`${results.length} devices found`);
+  }
+
   return (
     <div className="shell">
       <aside className="rail" aria-label="Raffael navigation">
@@ -124,6 +138,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
             <h1>system overview</h1>
           </div>
           <div className="topbar-actions">
+            <button className="add-client-button" type="button" aria-label="discover network" onClick={() => setShowDiscover(true)}>⌁</button>
             <button className="add-client-button" type="button" aria-label="add client" onClick={() => setShowAddClient(true)}>+</button>
             <div className="live-indicator"><span /> monitoring</div>
             <a className="account-link" href="#/login">sign in</a>
@@ -295,6 +310,17 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                 <button className="client-dialog-submit" type="submit"><span>+</span> add client</button>
                 {addClientMessage ? <p className="client-dialog-message" role="status">{addClientMessage}</p> : null}
               </form>
+            </section>
+          </div>
+        ) : null}
+        {showDiscover ? (
+          <div className="client-dialog-backdrop" role="presentation" onClick={() => setShowDiscover(false)}>
+            <section className="client-dialog" role="dialog" aria-modal="true" aria-labelledby="discover-title" onClick={(event) => event.stopPropagation()}>
+              <button className="client-dialog-close" type="button" aria-label="close" onClick={() => setShowDiscover(false)}>×</button>
+              <p className="section-kicker">raffael / discovery</p><h2 id="discover-title">scan network</h2>
+              <form className="client-dialog-form" onSubmit={discover}><label><span className="sr-only">network</span><input name="network" aria-label="network" defaultValue="192.168.1.0/24" required /></label><button className="client-dialog-submit" type="submit">scan</button></form>
+              {discoveryMessage ? <p className="client-dialog-message" role="status">{discoveryMessage}</p> : null}
+              {discovered.length ? <div className="cluster-members">{discovered.map((item) => <span key={item.address}>{item.hostname || item.address}{item.open_ports.length ? ` · ${item.open_ports.join(", ")}` : ""}</span>)}</div> : null}
             </section>
           </div>
         ) : null}

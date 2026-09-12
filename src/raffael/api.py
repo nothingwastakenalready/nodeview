@@ -17,6 +17,7 @@ from .history import HistoryStore, SqlAlchemyHistoryStore
 from .auth import AuthStore, CSRF_COOKIE, SESSION_COOKIE
 from .email_templates import confirmation_email, newsletter_confirmation_email, password_reset_email
 from .households import DeviceStore, connector_catalog
+from .connectors import discover_network
 from .mailer import SmtpMailer
 
 Checker = Callable[[Service], CheckResult]
@@ -67,6 +68,11 @@ class DeviceInput(BaseModel):
     endpoint: str | None = None
     credential_ref: str | None = None
     metadata: dict = Field(default_factory=dict)
+
+
+class DiscoveryInput(BaseModel):
+    network: str = Field(pattern=r"^\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}$")
+    workers: int = Field(default=32, ge=1, le=128)
 
 
 def result_json(result: CheckResult) -> dict:
@@ -289,6 +295,20 @@ def create_app(
                 device.credential_ref,
                 device.metadata,
             )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/household/discover")
+    def discover_devices(
+        request: DiscoveryInput,
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
+        x_csrf_token: str | None = Header(None),
+    ):
+        current_workspace(session_token)
+        require_csrf(session_token, x_csrf_token or csrf_token)
+        try:
+            return [item.__dict__ for item in discover_network(request.network, workers=request.workers)]
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
