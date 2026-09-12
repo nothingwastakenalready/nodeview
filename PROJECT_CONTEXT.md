@@ -198,6 +198,52 @@ The latest verified local state produced:
 - Mailpit health and SMTP delivery passed
 - account and newsletter test messages arrived
 - transparent logo rendered correctly in Mailpit
+
+## verbindlicher produkt-workflow
+
+Raffael wird als funktionale App entwickelt. Die Datenkette ist maßgeblich:
+
+`quelle -> gerät -> connector -> check -> status/latenz -> cluster/detail -> topology`
+
+### arbeitsreihenfolge
+
+1. **produktion schützen** — Datenbank sichern, Schema prüfen, Healthcheck
+   ausführen; keine ungetesteten Migrationen auf dem Live-Volume.
+2. **datenquelle anbinden** — Geräte ausschließlich über Website/API oder
+   einen getesteten Importpfad anlegen; keine stillen Proxmox-Direktimporte als
+   Endprodukt voraussetzen.
+3. **connector ausführen** — Für jeden Gerätetyp eine echte Prüfung definieren:
+   ICMP/Erreichbarkeit, HTTP/TCP, SNMP, Proxmox, Docker, SSH, UniFi, Hue und
+   Agenten. Zugangsdaten bleiben in Secret-Referenzen und werden nie in Git,
+   UI-Texten oder Logs ausgegeben.
+4. **zustand persistieren** — `pending` bedeutet ausschließlich „noch nicht
+   geprüft oder nicht konfiguriert“. Nach jedem Check werden Status, Latenz,
+   Fehler, Zeitstempel und Erfolgs-/Fehlerstreifen gespeichert.
+5. **UI aus echten Zuständen bauen** — Dashboard, Cluster, Detailansicht und
+   Konstellation lesen dieselbe Zustandsquelle. Demo-Services dürfen nicht als
+   Live-Werte erscheinen.
+6. **topologie visualisieren** — Kanten stammen nur aus bekannten
+   Eltern-/Abhängigkeitsbeziehungen. Ein benanntes Sternbild wird nur gewählt,
+   wenn die Graphform ausreichend passt; sonst wird ein klares, automatisch
+   gruppiertes Raffael-Muster erzeugt.
+7. **verifizieren und deployen** — Backend-Tests, Frontend-Build, Migrationstest
+   auf frischer und bestehender SQLite-Datenbank, Backup, Container-Neustart,
+   `/health` und manueller Website-Test.
+
+### definition of done
+
+Ein Gerät gilt erst als fertig integriert, wenn es über die Website angelegt,
+mit einem Connector geprüft, mit einem echten Status angezeigt, anklickbar und
+in den zustandsbasierten Clustern enthalten ist. Ein Eintrag in einer Liste
+allein ist kein fertiges Feature.
+
+### aktueller blocker
+
+Der Gerätebestand ist vorhanden, aber der Monitoring-Runner verarbeitet die
+`devices`-Tabelle noch nicht. Deshalb bleiben diese Datensätze `pending`,
+während die Demo-Einträge aus `services.yaml` weiterhin die alte Monitoring-
+Ansicht speisen. Der nächste technische Meilenstein ist die gemeinsame
+Zustandsquelle für Datenbankgeräte und Monitoring-Engine.
 - full Python suite: **54 passed**
 - two upstream Starlette/httpx deprecation warnings remain
 - one harmless pytest cache warning occurred because the test mount was
