@@ -56,6 +56,15 @@ An account must not be subscribed to the newsletter merely because it was
 created. Consent text, timestamp and subscription state must be retained for
 the consent record.
 
+## message design
+
+Transactional messages share a deliberately minimal black canvas: the centered
+Raffael mark, one lowercase heading and one underlined action. The logo is
+served as a transparent PNG because SVG images are not rendered consistently
+by email clients. Recipient addresses and account details are intentionally
+omitted from the HTML body. Until the public product descriptor is settled,
+the templates do not append a tagline or infrastructure label.
+
 ## local verification flow
 
 When `RAFFAEL_MAIL_PROVIDER=mailpit`, registration sends the confirmation

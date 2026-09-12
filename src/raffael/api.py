@@ -158,12 +158,13 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         public_url = os.environ.get("RAFFAEL_PUBLIC_URL", "http://127.0.0.1:8080").rstrip("/")
         verification_token = runtime_auth.issue_token(user.id, "email_verification")
-        verification_message = confirmation_email(recipient=user.email, confirmation_url=f"{public_url}/auth/confirm?token={verification_token}", logo_url=f"{public_url}/assets/raffael-logo-white.svg")
+        email_logo_url = f"{public_url}/assets/02-logo-varianten/logo-liquid-silver-weiss-transparent.png"
+        verification_message = confirmation_email(recipient=user.email, confirmation_url=f"{public_url}/auth/confirm?token={verification_token}", logo_url=email_logo_url)
         if runtime_mailer.enabled:
             runtime_mailer.send(user.email, verification_message)
         if account.newsletter_opt_in:
             newsletter_token = runtime_auth.start_newsletter(user.id, "i want to receive the raffael newsletter")
-            newsletter_message = newsletter_confirmation_email(recipient=user.email, confirmation_url=f"{public_url}/auth/newsletter/confirm?token={newsletter_token}", logo_url=f"{public_url}/assets/raffael-logo-white.svg")
+            newsletter_message = newsletter_confirmation_email(recipient=user.email, confirmation_url=f"{public_url}/auth/newsletter/confirm?token={newsletter_token}", logo_url=email_logo_url)
             if runtime_mailer.enabled:
                 runtime_mailer.send(user.email, newsletter_message)
         token, csrf = runtime_auth.create_session(user.id)
