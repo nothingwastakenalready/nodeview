@@ -61,8 +61,10 @@ body::before { opacity: .16; background-image: radial-gradient(#9fb9c7 .7px, tra
 .cluster-section { order: 4; }
 .overview-panel .section-kicker, .overview-panel .panel-meta, .overview-panel .topology-note { color: #8495a3; }
 .star-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 10px 8px; min-height: 300px; align-items: center; padding: 34px 6%; background: radial-gradient(circle at 8% 68%, #eef2f3 0 1px, transparent 2px), radial-gradient(circle at 17% 81%, #eef2f3 0 1px, transparent 2px), radial-gradient(circle at 31% 72%, #eef2f3 0 1px, transparent 2px), radial-gradient(circle at 46% 88%, #eef2f3 0 1px, transparent 2px), radial-gradient(circle at 61% 76%, #eef2f3 0 1px, transparent 2px), radial-gradient(circle at 77% 86%, #eef2f3 0 1px, transparent 2px), radial-gradient(circle at 92% 70%, #eef2f3 0 1px, transparent 2px); }
+.topology-lines { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.topology-lines line { stroke: #496273; stroke-width: .28; stroke-dasharray: 1.2 1.4; opacity: .72; }
 .overview-panel { min-height: 260px; }
-.star { position: absolute; width: 72px; aspect-ratio: 1; transform: translate(-50%, -50%); border: 0; padding: 0; cursor: grab; background: transparent; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--tone) 65%, transparent)); transition: transform 180ms ease, filter 180ms ease; touch-action: none; }
+.star { position: absolute; z-index: 1; width: 72px; aspect-ratio: 1; transform: translate(-50%, -50%); border: 0; padding: 0; cursor: grab; background: transparent; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--tone) 65%, transparent)); transition: transform 180ms ease, filter 180ms ease; touch-action: none; }
 .star.is-dragging { cursor: grabbing; transform: translate(-50%, -50%) scale(1.08); }
 .star:hover, .star.is-selected { transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 13px color-mix(in srgb, var(--tone) 90%, transparent)); }
 .star:focus-visible { outline: none; filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 15px var(--tone)); }

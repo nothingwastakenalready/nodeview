@@ -101,8 +101,8 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     }
   }
 
-  function positionFor(name: string, index: number): { x: number; y: number } {
-    return positions[name] ?? constellationPosition(index, states.length);
+  function positionFor(name: string, index: number, total = states.length): { x: number; y: number } {
+    return positions[name] ?? constellationPosition(index, total);
   }
 
   function moveStar(event: ReactPointerEvent<HTMLButtonElement>, name: string) {
@@ -249,6 +249,11 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     return devices.find((device) => device.id === parentId)?.name ?? `#${parentId}`;
   }
 
+  const stateByName = new Map(states.map((state) => [state.name, state]));
+  const constellationNodes: HouseholdDevice[] = devices.length
+    ? devices
+    : states.map((state, index) => ({ id: -(index + 1), name: state.name, connector: "", endpoint: null, parent_id: null, metadata: {}, status: "" } as HouseholdDevice));
+
   return (
     <div className="shell">
       <aside className="rail" aria-label="Raffael navigation">
@@ -320,35 +325,45 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               </div>
               <div className="panel-heading-actions"><span className="panel-meta">{states.length} configured</span><button className="add-client-button" type="button" aria-label="add client" onClick={() => setShowAddClient(true)}>+</button></div>
             </div>
-            <p className="topology-note">topology connections will appear once service dependencies are configured.</p>
+            <p className="topology-note">connections are drawn from known parent and dependency relationships.</p>
 
             {states.length === 0 ? (
               <div className="empty-state">nothing configured yet.</div>
             ) : (
               <div className="star-grid">
-                {states.map((state, index) => {
-                  const view = presentState(state);
-                  const selectedClass = selected?.name === state.name ? " is-selected" : "";
-                  const position = positionFor(state.name, index);
+                <svg className="topology-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                  {constellationNodes.filter((node) => node.parent_id !== null).map((node) => {
+                    const parent = constellationNodes.find((candidate) => candidate.id === node.parent_id);
+                    if (!parent) return null;
+                    const from = positionFor(parent.name, constellationNodes.indexOf(parent), constellationNodes.length);
+                    const to = positionFor(node.name, constellationNodes.indexOf(node), constellationNodes.length);
+                    return <line key={`${parent.id}-${node.id}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} />;
+                  })}
+                </svg>
+                {constellationNodes.map((node, index) => {
+                  const state = stateByName.get(node.name);
+                  const view = state ? presentState(state) : { tone: "pending" as const, label: "pending", latency: "—" };
+                  const selectedClass = selected?.name === node.name ? " is-selected" : "";
+                  const position = positionFor(node.name, index, constellationNodes.length);
                   return (
                     <button
-                      className={`star tone-${view.tone}${selectedClass}${dragging === state.name ? " is-dragging" : ""}`}
-                      key={state.name}
+                      className={`star tone-${view.tone}${selectedClass}${dragging === node.name ? " is-dragging" : ""}`}
+                      key={node.id}
                       type="button"
                       style={{ left: `${position.x}%`, top: `${position.y}%` }}
-                      onClick={() => { if (draggedRef.current) { draggedRef.current = false; return; } onSelect(state.name); }}
-                      onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDragging(state.name); draggedRef.current = false; }}
-                      onPointerMove={(event) => moveStar(event, state.name)}
+                      onClick={() => { if (draggedRef.current) { draggedRef.current = false; return; } if (state) onSelect(state.name); }}
+                      onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDragging(node.name); draggedRef.current = false; }}
+                      onPointerMove={(event) => moveStar(event, node.name)}
                       onPointerUp={(event) => { event.currentTarget.releasePointerCapture(event.pointerId); setDragging(null); }}
                       onPointerCancel={() => setDragging(null)}
-                      aria-label={`${state.name}: ${view.label}, ${view.latency}`}
+                      aria-label={`${node.name}: ${view.label}, ${view.latency}`}
                     >
                       <svg className="star-art" viewBox="0 0 100 100" aria-hidden="true">
                         <path d="M50 4v92M4 50h92M17.5 17.5l65 65M82.5 17.5l-65 65" />
                         <circle cx="50" cy="50" r="4" />
                       </svg>
                       <span className="star-inner">
-                        <span className="star-name">{state.name}</span>
+                        <span className="star-name">{node.name}</span>
                         <span className="star-status"><span className="status-dot" />{view.label}</span>
                       </span>
                     </button>
