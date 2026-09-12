@@ -48,10 +48,16 @@ function constellationPosition(index: number, total: number): { x: number; y: nu
 }
 
 type Point = { x: number; y: number };
-const CONSTELLATION_TEMPLATES: Array<{ name: string; points: Point[]; minimum: number }> = [
-  { name: "Großer Wagen", minimum: 7, points: [{ x: 18, y: 52 }, { x: 31, y: 42 }, { x: 44, y: 49 }, { x: 57, y: 39 }, { x: 72, y: 33 }, { x: 82, y: 52 }, { x: 67, y: 62 }] },
-  { name: "Cassiopeia", minimum: 5, points: [{ x: 15, y: 48 }, { x: 30, y: 32 }, { x: 45, y: 55 }, { x: 60, y: 32 }, { x: 76, y: 48 }] },
-  { name: "Orion", minimum: 8, points: [{ x: 25, y: 25 }, { x: 75, y: 25 }, { x: 20, y: 68 }, { x: 80, y: 68 }, { x: 40, y: 42 }, { x: 50, y: 51 }, { x: 60, y: 42 }, { x: 50, y: 78 }] },
+const CONSTELLATION_TEMPLATES: Array<{ name: string; points: Point[]; minimum: number; family: "hub" | "chain" | "cross" }> = [
+  { name: "Großer Wagen", family: "hub", minimum: 7, points: [{ x: 18, y: 52 }, { x: 31, y: 42 }, { x: 44, y: 49 }, { x: 57, y: 39 }, { x: 72, y: 33 }, { x: 82, y: 52 }, { x: 67, y: 62 }] },
+  { name: "Schwan", family: "hub", minimum: 6, points: [{ x: 50, y: 14 }, { x: 50, y: 38 }, { x: 50, y: 62 }, { x: 50, y: 86 }, { x: 28, y: 52 }, { x: 72, y: 52 }] },
+  { name: "Skorpion", family: "hub", minimum: 8, points: [{ x: 22, y: 25 }, { x: 38, y: 34 }, { x: 52, y: 48 }, { x: 60, y: 65 }, { x: 73, y: 76 }, { x: 84, y: 66 }, { x: 78, y: 52 }, { x: 64, y: 43 }] },
+  { name: "Cassiopeia", family: "chain", minimum: 5, points: [{ x: 15, y: 48 }, { x: 30, y: 32 }, { x: 45, y: 55 }, { x: 60, y: 32 }, { x: 76, y: 48 }] },
+  { name: "Löwe", family: "chain", minimum: 7, points: [{ x: 18, y: 48 }, { x: 30, y: 34 }, { x: 44, y: 29 }, { x: 57, y: 40 }, { x: 70, y: 31 }, { x: 80, y: 52 }, { x: 61, y: 68 }] },
+  { name: "Stier", family: "chain", minimum: 6, points: [{ x: 18, y: 42 }, { x: 35, y: 55 }, { x: 50, y: 46 }, { x: 64, y: 33 }, { x: 78, y: 47 }, { x: 87, y: 67 }] },
+  { name: "Orion", family: "cross", minimum: 8, points: [{ x: 25, y: 25 }, { x: 75, y: 25 }, { x: 20, y: 68 }, { x: 80, y: 68 }, { x: 40, y: 42 }, { x: 50, y: 51 }, { x: 60, y: 42 }, { x: 50, y: 78 }] },
+  { name: "Kreuz des Südens", family: "cross", minimum: 5, points: [{ x: 50, y: 16 }, { x: 50, y: 84 }, { x: 22, y: 50 }, { x: 78, y: 50 }, { x: 50, y: 50 }] },
+  { name: "Pegasus", family: "cross", minimum: 8, points: [{ x: 22, y: 28 }, { x: 72, y: 22 }, { x: 82, y: 68 }, { x: 30, y: 76 }, { x: 45, y: 38 }, { x: 58, y: 50 }, { x: 38, y: 60 }, { x: 68, y: 62 }] },
 ];
 
 function topologyTemplate(nodes: HouseholdDevice[]): { name: string; positions: Map<string, Point> } {
@@ -59,13 +65,10 @@ function topologyTemplate(nodes: HouseholdDevice[]): { name: string; positions: 
   nodes.forEach((node) => { if (node.parent_id !== null) degrees.set(node.parent_id, (degrees.get(node.parent_id) ?? 0) + 1); });
   const root = nodes.find((node) => node.parent_id === null) ?? nodes[0];
   const hubDegree = root ? degrees.get(root.id) ?? 0 : 0;
-  const template = hubDegree >= 4
-    ? CONSTELLATION_TEMPLATES[0]
-    : nodes.length >= 8 && hubDegree <= 2
-      ? CONSTELLATION_TEMPLATES[2]
-      : nodes.length >= 5 && hubDegree <= 2
-        ? CONSTELLATION_TEMPLATES[1]
-        : { name: "Raffael-Muster", points: [] };
+  const family = hubDegree >= 4 ? "hub" : nodes.length >= 8 ? "cross" : "chain";
+  const candidates = CONSTELLATION_TEMPLATES.filter((item) => item.family === family && item.minimum <= nodes.length);
+  const fingerprint = nodes.reduce((sum, node) => sum + node.name.split("").reduce((value, char) => value + char.charCodeAt(0), 0), 0);
+  const template = candidates.length ? candidates[fingerprint % candidates.length] : { name: "Raffael-Muster", points: [] };
   const ordered: HouseholdDevice[] = [];
   if (root) ordered.push(root);
   for (const node of nodes) if (node !== root && !ordered.includes(node)) ordered.push(node);
