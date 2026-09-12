@@ -1,12 +1,12 @@
-# nodeview ui shell design
+# raffael ui shell design
 
 ## status
 
-Approved direction for the first runnable NodeView UI. This is intentionally a shell on top of the existing v0.3 monitoring state, not the final node/workspace data model.
+Approved direction for the first runnable Raffael UI. This is intentionally a shell on top of the existing v0.3 monitoring state, not the final node/workspace data model.
 
 ## goal
 
-Give NodeView a useful browser interface now: dark, compact enough for operations, modern enough not to look like a legacy admin panel, and simple enough to evolve in Codex without throwing away the foundation.
+Give Raffael a useful browser interface now: dark, compact enough for operations, modern enough not to look like a legacy admin panel, and simple enough to evolve in Codex without throwing away the foundation.
 
 ## design direction
 

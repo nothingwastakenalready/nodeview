@@ -28,18 +28,18 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
 
   return (
     <div className="shell">
-      <aside className="rail" aria-label="NodeView navigation">
-        <div className="brand-mark" aria-label="NodeView">nv</div>
+      <aside className="rail" aria-label="Raffael navigation">
+        <div className="brand-mark" aria-label="Raffael">r</div>
         <div className="rail-line" />
         <div className="rail-item rail-item-active" aria-hidden="true">01</div>
         <div className="rail-spacer" />
-        <div className="rail-version">0.3</div>
+        <div className="rail-version">0.4</div>
       </aside>
 
       <main className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">nodeview / live</p>
+            <p className="eyebrow">raffael / live</p>
             <h1>infrastructure</h1>
           </div>
           <div className="live-indicator"><span /> monitoring</div>
@@ -112,7 +112,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                   <div className="latency-block">
                     <span>latency now</span>
                     <strong>{view.latency}</strong>
-                    <small>history lands with persistence.</small>
+                    <small>history is recording.</small>
                   </div>
 
                   <dl className="detail-list">

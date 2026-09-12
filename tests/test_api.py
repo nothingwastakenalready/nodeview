@@ -1,11 +1,13 @@
 import asyncio
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
-from nodeview.api import create_app
-from nodeview.checks import CheckResult
-from nodeview.config import Service
-from nodeview.engine import MonitoringEngine
+from raffael.api import create_app
+from raffael.checks import CheckResult
+from raffael.config import Service
+from raffael.engine import MonitoringEngine
+from raffael.history import Measurement
 
 
 def test_health_does_not_run_checks(tmp_path):
@@ -104,14 +106,64 @@ def test_lifespan_starts_and_stops_injected_engine(tmp_path):
     assert engine.stopped is True
 
 
+def test_history_returns_bounded_measurements_for_a_service(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+
+    class FakeHistory:
+        def history(self, service_name, start=None, end=None, limit=500):
+            assert service_name == "api"
+            assert start == datetime(2026, 9, 12, 8, 0, tzinfo=timezone.utc)
+            assert end is None
+            assert limit == 25
+            return [
+                Measurement(
+                    service_name="api",
+                    status="up",
+                    latency_ms=9,
+                    http_status=200,
+                    error=None,
+                    checked_at=datetime(2026, 9, 12, 8, 1, tzinfo=timezone.utc),
+                )
+            ]
+
+    client = TestClient(create_app(config_path=config, history=FakeHistory()))
+    response = client.get(
+        "/history/api",
+        params={"from": "2026-09-12T08:00:00Z", "limit": 25},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "service_name": "api",
+            "status": "up",
+            "latency_ms": 9,
+            "http_status": 200,
+            "error": None,
+            "checked_at": "2026-09-12T08:01:00+00:00",
+        }
+    ]
+
+
+def test_history_limit_is_capped_by_validation(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    client = TestClient(create_app(config_path=config, history=object()))
+
+    response = client.get("/history/api", params={"limit": 1001})
+
+    assert response.status_code == 422
+
+
 def test_serves_built_ui_from_supplied_directory(tmp_path):
     config = tmp_path / "services.yaml"
     config.write_text("services: []\n")
     ui = tmp_path / "dist"
     assets = ui / "assets"
     assets.mkdir(parents=True)
-    (ui / "index.html").write_text("<html><body>nodeview ui</body></html>")
-    (assets / "app.js").write_text("console.log('nodeview')")
+    (ui / "index.html").write_text("<html><body>raffael ui</body></html>")
+    (assets / "app.js").write_text("console.log('raffael')")
 
     client = TestClient(create_app(config_path=config, ui_path=ui))
 
@@ -119,6 +171,6 @@ def test_serves_built_ui_from_supplied_directory(tmp_path):
     asset = client.get("/assets/app.js")
 
     assert root.status_code == 200
-    assert "nodeview ui" in root.text
+    assert "raffael ui" in root.text
     assert asset.status_code == 200
-    assert "nodeview" in asset.text
+    assert "raffael" in asset.text

@@ -44,7 +44,7 @@ export function App() {
   }, []);
 
   if (loading) {
-    return <div className="boot-state">nodeview is looking around.</div>;
+    return <div className="boot-state">raffael is looking around.</div>;
   }
 
   if (error && states.length === 0) {

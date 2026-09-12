@@ -1,8 +1,8 @@
-# nodeview roadmap
+# raffael roadmap
 
 this is the product roadmap, not a promise to ship all of it quickly.
 
-Each phase should leave nodeview in a working state. Detailed implementation plans live separately under `docs/superpowers/plans/` immediately before execution.
+Each phase should leave raffael in a working state. Detailed implementation plans live separately under `docs/superpowers/plans/` immediately before execution.
 
 ## stream 0 — project foundations
 
@@ -75,6 +75,8 @@ Exit criteria:
 
 Goal: answer `what changed?` rather than only `what is true right now?`.
 
+Progress: the first v0.4 slice now stores scheduled measurements in SQLite through SQLAlchemy, ships an initial Alembic migration and exposes bounded UTC time-range history. State-change events, retention and uptime calculation remain.
+
 Scope:
 
 - SQLAlchemy persistence layer
@@ -102,7 +104,7 @@ Exit criteria:
 
 ## stream 4 — first real web product (v0.5)
 
-Goal: nodeview becomes usable without editing YAML or reading JSON.
+Goal: raffael becomes usable without editing YAML or reading JSON.
 
 Scope:
 
@@ -127,7 +129,7 @@ Exit criteria:
 
 ## stream 5 — accounts + workspaces + tenant isolation (v0.6)
 
-Goal: multiple people can use one nodeview instance safely.
+Goal: multiple people can use one raffael instance safely.
 
 Data model:
 
@@ -161,7 +163,7 @@ Exit criteria:
 - privileged operations are role-gated
 - auth lifecycle is tested
 
-## stream 6 — the nodeview visual identity (v0.7)
+## stream 6 — the raffael visual identity (v0.7)
 
 Goal: the interface stops looking like another CRUD monitoring dashboard.
 
@@ -205,7 +207,7 @@ Scope:
 
 Important rule:
 
-NodeView may suggest likely upstream causes but must not claim causal certainty from topology alone.
+Raffael may suggest likely upstream causes but must not claim causal certainty from topology alone.
 
 Exit criteria:
 
@@ -213,7 +215,7 @@ Exit criteria:
 - failures propagate as `affected` without overwriting the actual check state
 - graph remains navigable on realistic small/medium homelabs
 
-## stream 8 — nodeview agent (v0.9)
+## stream 8 — raffael agent (v0.9)
 
 Goal: go beyond outside-in reachability checks.
 
@@ -258,7 +260,7 @@ Exit criteria:
 
 ## stream 9 — alerting + operations (v0.10)
 
-Goal: nodeview becomes useful when nobody is staring at it.
+Goal: raffael becomes useful when nobody is staring at it.
 
 Scope:
 
@@ -299,7 +301,7 @@ Non-goal:
 
 Exit criteria:
 
-- Prometheus can scrape NodeView itself and monitor/check metrics
+- Prometheus can scrape Raffael itself and monitor/check metrics
 - third-party tools can consume stable documented data
 
 ## stream 11 — desktop application (v0.12)
@@ -317,7 +319,7 @@ Preferred direction:
 
 Possible connection modes:
 
-1. connect to an existing NodeView server
+1. connect to an existing Raffael server
 2. later evaluate bundled local server for a single-machine experience
 
 Start with mode 1. Bundling backend/database creates a separate lifecycle problem and is not necessary initially.
@@ -330,7 +332,7 @@ Exit criteria:
 
 ## stream 12 — open-source release quality (1.0 candidate)
 
-Goal: a stranger can safely install, understand and contribute to nodeview.
+Goal: a stranger can safely install, understand and contribute to raffael.
 
 Scope:
 

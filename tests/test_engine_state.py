@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from nodeview.checks import CheckResult
-from nodeview.config import Service
-from nodeview.engine import apply_error, apply_result, initial_state
+from raffael.checks import CheckResult
+from raffael.config import Service
+from raffael.engine import apply_error, apply_result, initial_state
 
 NOW = datetime(2026, 9, 11, 3, 45, tzinfo=timezone.utc)
 

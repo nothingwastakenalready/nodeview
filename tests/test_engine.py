@@ -2,9 +2,9 @@ import asyncio
 import threading
 import time
 
-from nodeview.checks import CheckResult
-from nodeview.config import Service
-from nodeview.engine import MonitoringEngine
+from raffael.checks import CheckResult
+from raffael.config import Service
+from raffael.engine import MonitoringEngine
 
 
 def make_service(name="api", **overrides):
@@ -42,6 +42,26 @@ def test_run_once_updates_state():
 
         assert engine.states()["api"].status == "up"
         assert engine.states()["api"].latency_ms == 7
+
+    asyncio.run(scenario())
+
+
+def test_run_once_records_the_resulting_state():
+    class RecordingHistory:
+        def __init__(self):
+            self.states = []
+
+        def record(self, state):
+            self.states.append(state)
+
+    async def scenario():
+        service = make_service()
+        history = RecordingHistory()
+        engine = MonitoringEngine([service], checker=healthy, history=history)
+
+        result = await engine.run_once(service)
+
+        assert history.states == [result]
 
     asyncio.run(scenario())
 

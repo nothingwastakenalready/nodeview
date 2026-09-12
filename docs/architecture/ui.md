@@ -1,12 +1,12 @@
-# nodeview ui direction
+# raffael ui direction
 
 This is the current design handoff for the browser interface.
 
 ## product posture
 
-NodeView should look like a real internal infrastructure tool, not a landing page and not a generic admin template.
+Raffael should look like a real internal infrastructure tool, not a landing page and not a generic admin template.
 
-NodeView is not a Checkmk clone.
+Raffael is not a Checkmk clone.
 
 Checkmk is only one reference for dense operational scanning and host/service status semantics. The visual language should draw more broadly from monitoring, observability, infrastructure visualizers and modern technical tools.
 
@@ -18,9 +18,9 @@ Useful references by category:
 - Grafana / Datadog / New Relic: dashboards, time-series reading, filtering, drill-down, incident context
 - Honeycomb / SigNoz-style observability tools: event-first investigation, high-cardinality exploration, trace-like navigation ideas later
 - Docker and infrastructure visualizers: live topology, container/network relationships, object maps
-- Linear / Vercel / Raycast / modern developer tools: restrained dark UI, sharp typography, command-oriented polish, low visual noise
+- Linear / Vercel / Raycast / modern developer tools: sharp typography, command-oriented polish and low visual noise
 
-The goal is a distinct NodeView identity: technical, restrained, fast to read, slightly opinionated, and not visually owned by any one existing product.
+The goal is a distinct Raffael identity: technical, restrained, fast to read, slightly opinionated, and not visually owned by any one existing product.
 
 ## design principles
 
@@ -60,7 +60,7 @@ Each tile currently shows:
 - readable status
 - status ring/color
 
-The inside remains dark. Status lives mostly on the perimeter so a large grid does not become a wall of saturated color.
+The inside remains quiet. Status lives mostly on the perimeter so a large grid does not become a wall of saturated color.
 
 Target desktop density is roughly 15–25 useful tiles on a 1440p display once the real node model exists. Do not cram CPU, RAM, uptime, service counts and every secondary metric into the overview tile.
 
@@ -126,8 +126,9 @@ The overview should migrate from service tiles to node tiles once that backend m
 
 ## visual rules
 
-- dark neutral background, not pure black
+- light warm-neutral application background; avoid sterile pure white across the whole canvas
 - restrained borders and surfaces
+- dark mode may follow later, but the light system is the current design target
 - avoid copying Checkmk's exact palette, density, iconography or spacing
 - no gratuitous gradients
 - no cyberpunk/neon treatment as the default identity
@@ -148,7 +149,7 @@ Good:
 - `current state`
 - `last checked`
 - `nothing configured yet.`
-- `history lands with persistence.`
+- `history is recording.`
 
 Avoid:
 
@@ -180,6 +181,6 @@ Design iteration can change spacing, typography, exact colors, hexagon geometry,
 - detail is calmer than overview
 - no fake metrics are introduced
 - current service-as-tile representation is understood as temporary
-- the result feels like NodeView, not Checkmk wearing different CSS
+- the result feels like Raffael, not Checkmk wearing different CSS
 
 Before adding topology or historical charts, wait until the corresponding backend data is real.

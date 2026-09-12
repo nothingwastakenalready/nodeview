@@ -6,5 +6,7 @@ venv/
 *.egg-info/
 dist/
 build/
+web/node_modules/
 .env
 services.yaml
+uv.lock

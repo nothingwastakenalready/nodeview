@@ -1,10 +1,10 @@
-# nodeview project context
+# raffael project context
 
-Read this first when continuing nodeview in a new session.
+Read this first when continuing raffael in a new session.
 
 ## what this is
 
-NodeView is becoming a self-hosted, open-source infrastructure monitoring and observability application. It started as a small Python HTTP/TCP checker. Do not rewrite the working core just to make the project look bigger.
+Raffael is becoming a self-hosted, open-source infrastructure monitoring and observability application. It started as a small Python HTTP/TCP checker. Do not rewrite the working core just to make the project look bigger.
 
 The product should answer quickly:
 
@@ -16,15 +16,15 @@ The long-term product is multi-user and workspace-based, with a browser UI and l
 
 ## visual/product decisions already made
 
-- NodeView must not become a Checkmk clone
+- Raffael must not become a Checkmk clone
 - Checkmk is only one reference for dense operational scanning and host/service status semantics
 - broader visual inspiration should also come from Uptime Kuma, Gatus, Beszel, Netdata, Grafana, Datadog, New Relic, Honeycomb/SigNoz-style observability tools, Docker/infrastructure visualizers and modern developer tools like Linear/Vercel/Raycast
 - primary infrastructure overview currently uses hexagonal tiles, but the hexagon is a motif, not a permanent constraint
-- dark/restrained interface
+- light, calm application canvas with restrained technical surfaces; dark mode can follow later
 - density model: overview is compact, topology medium-density, detail spacious
 - monitoring color spectrum: healthy / warning / critical / unknown / pending, with later `affected` for topology-derived downstream impact
 - do not copy any product's exact layout, colors, icons, spacing or component shapes one-to-one
-- dark tile interiors with stronger status perimeter/ring are currently preferred over fully saturated tiles
+- quiet tile interiors with stronger status perimeter/ring are preferred over fully saturated tiles
 - status must remain understandable without color alone
 - current health and latency should be visible at a glance
 - latency is a first-class metric and gets history graphs once persistence exists
@@ -36,9 +36,9 @@ The long-term product is multi-user and workspace-based, with a browser UI and l
 
 ## UI identity target
 
-NodeView should feel technical, restrained, fast to read, slightly opinionated and self-hosted-native.
+Raffael should feel technical, restrained, fast to read, slightly opinionated and self-hosted-native.
 
-The first UI shell is allowed to be imperfect. Its job is to make the running monitor visible. Future UI work should create a distinct NodeView design language rather than polishing the current shell into a Checkmk-adjacent clone.
+The first UI shell is allowed to be imperfect. Its job is to make the running monitor visible. Future UI work should create a distinct Raffael design language rather than polishing the current shell into a Checkmk-adjacent clone.
 
 Core UI principles:
 
@@ -61,7 +61,7 @@ Core UI principles:
 - Docker/infrastructure visualizers: live topology and object relationship maps
 - Linear/Vercel/Raycast-style developer tools: restrained modern technical polish and low visual noise
 
-NodeView should combine useful ideas without becoming a clone of any of them.
+Raffael should combine useful ideas without becoming a clone of any of them.
 
 ## data model direction
 
@@ -94,7 +94,7 @@ Important boundaries:
 - secrets must not appear in examples/logs/public APIs
 - desktop credentials eventually use OS credential storage
 
-Continuous scheduling increases the importance of SSRF/egress controls because configured targets are contacted repeatedly. Until target-policy hardening and auth/tenant isolation exist, NodeView remains trusted/self-hosted and should not be exposed to untrusted users.
+Continuous scheduling increases the importance of SSRF/egress controls because configured targets are contacted repeatedly. Until target-policy hardening and auth/tenant isolation exist, Raffael remains trusted/self-hosted and should not be exposed to untrusted users.
 
 Before a serious public release: threat model, security review/pentest, security regression tests, dependency/static/secret/container scanning, SECURITY.md, private vulnerability reporting path, OpenSSF review. An independent human review is still desirable before a security-sensitive 1.0.
 
@@ -133,7 +133,7 @@ Desktop later:
 
 - Tauri 2 direction
 - reuse web frontend
-- first desktop mode connects to an existing NodeView server; do not bundle the whole backend initially
+- first desktop mode connects to an existing Raffael server; do not bundle the whole backend initially
 
 ## development order
 
@@ -144,7 +144,7 @@ Immediate sequence:
 1. v0.2 always-on API + Docker — implemented
 2. v0.3 scheduler/state engine — implemented
 3. first browser UI shell — implemented after v0.3, intentionally before persistence so the project can be inspected locally
-4. v0.4 persistence/history/latency — next major backend slice
+4. v0.4 persistence/history/latency — in progress; durable measurements and history API implemented first
 5. proper node/workspace model + richer web UI
 6. accounts/workspaces/tenant isolation
 7. real node overview with its own visual language
@@ -157,9 +157,9 @@ Immediate sequence:
 
 Do not jump directly to pretty topology before the monitoring state engine/history and real dependency data are trustworthy.
 
-## current state — 2026-09-11
+## current state — 2026-09-12
 
-v0.3 added the first actual monitoring engine.
+Raffael replaces the former project name across product, package, API and documentation. v0.4 has started on top of the v0.3 monitoring engine.
 
 Implemented backend behavior:
 
@@ -184,7 +184,7 @@ Implemented backend behavior:
 
 First browser UI shell:
 
-- compact dark dashboard
+- compact first dashboard shell; a light redesign is now the target
 - summary counts for healthy/warning/critical/unknown/pending
 - hexagonal overview tiles showing service name, current latency and readable status
 - selected-service detail with last check, HTTP status, streak counters and last error
@@ -195,17 +195,17 @@ First browser UI shell:
 - production frontend compiled through a Node Docker stage and served from the same FastAPI container
 - Compose remains a single service and localhost-only by default
 
-State is still intentionally in-memory. Restarting NodeView resets state to pending. There is no measurement history, uptime calculation, database, alerting, authentication, final node/workspace model or dependency topology yet.
+Current operational state remains intentionally in-memory and resets to pending after restart. Scheduled check measurements now persist in SQLite through a SQLAlchemy boundary, with an initial Alembic migration and bounded UTC time-range API. There is no uptime calculation, retention job, state-change event table, alerting, authentication, final node/workspace model or dependency topology yet.
 
-The next major backend slice is v0.4: persistence + history. It should introduce a proper persistence boundary, migrations, measurements/state-change events, latency history, retention policy, and time-range APIs without turning NodeView into a general-purpose TSDB.
+The remaining v0.4 work is state-change events, retention and uptime calculation. Keep the slice narrow; Raffael is not a general-purpose TSDB.
 
 ## local inspection
 
 The intended local flow is:
 
 ```bash
-git clone https://github.com/nothingwastakenalready/nodeview.git
-cd nodeview
+git clone https://github.com/nothingwastakenalready/raffael.git
+cd raffael
 cp services.example.yaml services.yaml
 docker compose up -d --build
 ```
@@ -235,10 +235,10 @@ Keep commits human and slightly dry/understated. Avoid marketing language and fa
 - `docs/architecture/product-vision.md` — long-term architecture/product/security direction
 - `docs/architecture/roadmap.md` — staged development streams
 - `docs/architecture/ui.md` — current UI direction and Codex handoff
-- `docs/superpowers/specs/2026-09-10-nodeview-v0.2-design.md` — v0.2 design
-- `docs/superpowers/specs/2026-09-11-nodeview-v0.3-design.md` — scheduler/state-engine design
-- `docs/superpowers/plans/2026-09-11-nodeview-v0.3.md` — v0.3 implementation plan
-- `docs/superpowers/specs/2026-09-11-nodeview-ui-shell-design.md` — first browser UI shell design
-- `docs/superpowers/plans/2026-09-11-nodeview-ui-shell.md` — UI shell implementation plan
+- `docs/superpowers/specs/2026-09-10-raffael-v0.2-design.md` — v0.2 design
+- `docs/superpowers/specs/2026-09-11-raffael-v0.3-design.md` — scheduler/state-engine design
+- `docs/superpowers/plans/2026-09-11-raffael-v0.3.md` — v0.3 implementation plan
+- `docs/superpowers/specs/2026-09-11-raffael-ui-shell-design.md` — first browser UI shell design
+- `docs/superpowers/plans/2026-09-11-raffael-ui-shell.md` — UI shell implementation plan
 
 If a future conversation is missing context, read these files before proposing architecture changes.

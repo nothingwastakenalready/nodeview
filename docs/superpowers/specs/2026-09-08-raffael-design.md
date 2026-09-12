@@ -1,4 +1,4 @@
-# nodeview design
+# raffael design
 
 ## why
 
@@ -6,7 +6,7 @@ i have too many random things running at home and got tired of checking them one
 
 there are obviously a hundred tools that already do this. i didn't want any of them.
 
-nodeview starts small: give it a list of services, it checks them and tells you what answered.
+raffael starts small: give it a list of services, it checks them and tells you what answered.
 
 ## v0.1
 

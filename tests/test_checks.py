@@ -1,8 +1,8 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 
-from nodeview.checks import check_http
-from nodeview.config import Service
+from raffael.checks import check_http
+from raffael.config import Service
 
 
 class Handler(BaseHTTPRequestHandler):

@@ -1,8 +1,8 @@
 import socket
 from threading import Thread
 
-from nodeview.checks import check_tcp
-from nodeview.config import Service
+from raffael.checks import check_tcp
+from raffael.config import Service
 
 
 def listening_socket():
@@ -11,7 +11,10 @@ def listening_socket():
     server.listen(1)
 
     def accept_one():
-        connection, _ = server.accept()
+        try:
+            connection, _ = server.accept()
+        except OSError:
+            return
         connection.close()
 
     Thread(target=accept_one, daemon=True).start()

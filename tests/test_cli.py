@@ -1,5 +1,5 @@
-from nodeview.checks import CheckResult
-from nodeview.cli import format_result
+from raffael.checks import CheckResult
+from raffael.cli import format_result
 
 
 def test_formats_http_up_result():

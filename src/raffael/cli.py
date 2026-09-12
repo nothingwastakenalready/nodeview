@@ -23,7 +23,7 @@ def format_result(result: CheckResult) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="nodeview")
+    parser = argparse.ArgumentParser(prog="raffael")
     parser.add_argument("config", help="yaml file with services to check")
     args = parser.parse_args(argv)
 

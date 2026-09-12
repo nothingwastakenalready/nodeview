@@ -1,6 +1,6 @@
-# nodeview product vision
+# raffael product vision
 
-nodeview starts as a small health checker and grows into a self-hosted, open-source infrastructure monitoring application.
+raffael starts as a small health checker and grows into a self-hosted, open-source infrastructure monitoring application.
 
 not trying to beat checkmk, prometheus, grafana, uptime kuma or netdata at their own game.
 
@@ -8,7 +8,7 @@ steal the good ideas, keep the shape smaller.
 
 ## product idea
 
-nodeview should answer three questions fast:
+raffael should answer three questions fast:
 
 1. what is broken?
 2. what is getting worse?
@@ -46,7 +46,7 @@ One backend, multiple clients.
                     web frontend
                           |
                           v
-agent(s) -----> nodeview api/core <----- desktop app
+agent(s) -----> raffael api/core <----- desktop app
                      |    |
                      |    +-- auth / workspaces
                      |    +-- scheduler / checks
@@ -63,7 +63,7 @@ The desktop app should reuse the same frontend rather than becoming a second pro
 
 ### overview
 
-- dark, restrained interface
+- light, calm and restrained interface by default
 - hexagonal node map as the main infrastructure overview
 - monitoring status spectrum similar in semantics to mature monitoring systems: healthy / warning / critical / unknown / pending
 - color communicates state, not decoration
@@ -85,7 +85,7 @@ A selected node opens a detail view with:
 
 ### dependency view
 
-A graph connects infrastructure relationships so nodeview can distinguish multiple symptoms from a shared likely cause.
+A graph connects infrastructure relationships so raffael can distinguish multiple symptoms from a shared likely cause.
 
 Example:
 
@@ -150,7 +150,7 @@ Thresholds are check-aware and configurable. A single global `100ms = bad` rule 
 
 ### later agent telemetry
 
-A small nodeview agent can report host-level data such as:
+A small raffael agent can report host-level data such as:
 
 - CPU
 - memory
@@ -167,7 +167,7 @@ The long-term agent should be a small standalone binary with minimal privileges.
 
 Measurements are append-oriented time-series data. The product needs retention/downsampling rules before high-frequency telemetry is enabled.
 
-Do not build a full Prometheus replacement. NodeView stores enough history for its own UX and can later expose Prometheus-compatible metrics for users who want deeper external analysis.
+Do not build a full Prometheus replacement. Raffael stores enough history for its own UX and can later expose Prometheus-compatible metrics for users who want deeper external analysis.
 
 ## security model
 
@@ -195,7 +195,7 @@ security is architecture, not a v1 checkbox.
 
 Monitoring intentionally makes outbound network requests, so target validation is a core security boundary.
 
-NodeView must distinguish deployment modes:
+Raffael must distinguish deployment modes:
 
 - trusted self-hosted mode: operator can permit private networks
 - hosted/multi-tenant mode: strict target policy, address resolution checks and network egress controls
@@ -336,7 +336,7 @@ borrow:
 
 avoid:
 
-- turning nodeview into only another resource graph dashboard
+- turning raffael into only another resource graph dashboard
 
 ## non-goals
 
@@ -353,7 +353,7 @@ avoid:
 
 A technically competent stranger should eventually be able to:
 
-1. clone or pull nodeview
+1. clone or pull raffael
 2. run it with Docker Compose
 3. create an account
 4. create a workspace

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from nodeview.config import load_services
+from raffael.config import load_services
 
 
 def test_loads_http_and_tcp_services_from_yaml(tmp_path: Path):

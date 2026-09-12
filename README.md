@@ -1,4 +1,4 @@
-# nodeview
+# raffael
 
 i have too many random things running at home and got tired of checking them one by one.
 
@@ -15,6 +15,8 @@ there are obviously a hundred tools that do this already. i didn't want any of t
 - http api
 - always-on scheduler
 - current state with `pending / up / warning / critical / unknown`
+- durable sqlite measurement history
+- bounded per-service history api with utc time ranges
 - failure/recovery thresholds so one bad sample does not immediately become the apocalypse
 - first browser ui with a compact hexagon overview and current latency
 - docker because leaving a terminal open forever is stupid
@@ -24,8 +26,8 @@ there are obviously a hundred tools that do this already. i didn't want any of t
 You only need Git and Docker Desktop (or Docker Engine + Compose).
 
 ```bash
-git clone https://github.com/nothingwastakenalready/nodeview.git
-cd nodeview
+git clone https://github.com/nothingwastakenalready/raffael.git
+cd raffael
 cp services.example.yaml services.yaml
 docker compose up -d --build
 ```
@@ -50,10 +52,11 @@ API is still there:
 GET  /health
 GET  /services
 GET  /state
+GET  /history/{service_name}
 POST /check
 ```
 
-`/services` runs the configured checks on request. `/state` shows what the scheduler currently believes. `/check` does one ad-hoc http/tcp check without changing config.
+`/services` runs the configured checks on request. `/state` shows what the scheduler currently believes. `/history/{service_name}` returns stored scheduled measurements and accepts optional `from`, `to` and `limit` query parameters. `/check` does one ad-hoc http/tcp check without changing config.
 
 config is still deliberately boring:
 
@@ -86,7 +89,7 @@ npm install
 npm run dev
 ```
 
-Vite proxies the NodeView API during development. The production Docker image builds the frontend and serves it from FastAPI, so there is no second service to operate.
+Vite proxies the Raffael API during development. The production Docker image builds the frontend and serves it from FastAPI, so there is no second service to operate.
 
 The current screen uses services as overview tiles because the real node/workspace model does not exist yet. That is temporary and documented in `docs/architecture/ui.md`.
 
@@ -94,11 +97,11 @@ The current screen uses services as overview tiles because the real node/workspa
 
 this stopped being just a cli experiment.
 
-nodeview is heading toward a small self-hosted monitoring thing with history, users/workspaces, a proper node model, dependency graphs and eventually agents.
+raffael is heading toward a small self-hosted monitoring thing with history, users/workspaces, a proper node model, dependency graphs and eventually agents.
 
 not all at once. that would be how this becomes terrible.
 
-next useful backend problem: persistence and history. current state disappearing on restart is fine for 0.3 and not fine forever.
+v0.4 has started with durable measurement history. retention, uptime aggregation and state-change events are the next pieces of that backend slice.
 
 see `docs/architecture/product-vision.md`, `docs/architecture/roadmap.md` and `docs/architecture/ui.md` for the longer version.
 

@@ -2,11 +2,16 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+from typing import Protocol
 
 from .checks import CheckResult, check_service
 from .config import Service
 
 Checker = Callable[[Service], CheckResult]
+
+
+class HistoryRecorder(Protocol):
+    def record(self, state: "ServiceState") -> None: ...
 
 
 @dataclass(frozen=True)
@@ -83,11 +88,13 @@ class MonitoringEngine:
         services: list[Service],
         checker: Checker = check_service,
         max_concurrency: int = 10,
+        history: HistoryRecorder | None = None,
     ) -> None:
         if max_concurrency < 1:
             raise ValueError("max_concurrency must be at least one")
         self._services = list(services)
         self._checker = checker
+        self._history = history
         self._states = {service.name: initial_state(service) for service in services}
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._tasks: dict[str, asyncio.Task[None]] = {}
@@ -108,6 +115,8 @@ class MonitoringEngine:
             state = apply_result(previous, result, service, checked_at)
 
         self._states[service.name] = state
+        if self._history is not None:
+            await asyncio.to_thread(self._history.record, state)
         return state
 
     async def start(self) -> None:
@@ -115,7 +124,7 @@ class MonitoringEngine:
             return
 
         self._tasks = {
-            service.name: asyncio.create_task(self._run_service(service), name=f"nodeview:{service.name}")
+            service.name: asyncio.create_task(self._run_service(service), name=f"raffael:{service.name}")
             for service in self._services
         }
 

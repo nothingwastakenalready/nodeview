@@ -1,14 +1,14 @@
-# NodeView UI Shell Implementation Plan
+# Raffael UI Shell Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the first production-served NodeView browser UI on top of the existing v0.3 `/state` API.
+**Goal:** Build the first production-served Raffael browser UI on top of the existing v0.3 `/state` API.
 
 **Architecture:** A small React/TypeScript/Vite frontend lives under `web/`. It fetches monitoring state from the same-origin FastAPI API, renders a dense hexagon overview plus a spacious selected-monitor detail panel, and is built into the existing Docker image through a multi-stage build. FastAPI serves the compiled assets without changing existing API semantics.
 
 **Tech Stack:** Python 3.11+, FastAPI, React 19.3, TypeScript, Vite 8.x, Vitest 5, Docker multi-stage build.
 
-**Spec:** `docs/superpowers/specs/2026-09-11-nodeview-ui-shell-design.md`
+**Spec:** `docs/superpowers/specs/2026-09-11-raffael-ui-shell-design.md`
 
 ## Global Constraints
 
@@ -62,7 +62,7 @@
 
 **Files:**
 - Modify: `tests/test_api.py`
-- Modify: `src/nodeview/api.py`
+- Modify: `src/raffael/api.py`
 
 **Interfaces:**
 - `create_app(..., ui_path: str | Path | None = None)`
