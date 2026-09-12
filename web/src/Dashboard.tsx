@@ -527,7 +527,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                   <span role="cell">{client.endpoint || "not set"}</span>
                   <span role="cell">{parentName(client.parent_id)}</span>
                   <span role="cell">{client.connector}</span>
-                  <span role="cell">{String(client.metadata.mac_address || "not set")}</span>
+                  <span role="cell">{String(client.metadata.mac_address || "not set")} <button type="button" className="device-edit-button" onClick={() => setEditingDevice(client)} aria-label={`edit ${client.name}`}>edit</button></span>
                 </div>
               ))}
             </div>
