@@ -67,3 +67,16 @@ def newsletter_confirmation_email(*, recipient: str, confirmation_url: str, logo
             logo_url=logo_url,
         ),
     )
+
+
+def password_reset_email(*, recipient: str, reset_url: str, logo_url: str) -> EmailMessage:
+    return EmailMessage(
+        subject="reset your raffael password",
+        text=f"reset password:\n{reset_url}\n",
+        html=_minimal_email(
+            heading="reset password",
+            action="reset",
+            confirmation_url=reset_url,
+            logo_url=logo_url,
+        ),
+    )

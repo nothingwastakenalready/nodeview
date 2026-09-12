@@ -28,6 +28,21 @@ def test_email_and_newsletter_tokens_are_single_use(tmp_path):
     store.close()
 
 
+def test_password_reset_updates_password_and_revokes_sessions(tmp_path):
+    store = AuthStore(f"sqlite:///{tmp_path / 'reset.db'}")
+    store.initialize()
+    user = store.register("owner@example.com", "a sufficiently long password")
+    store.create_session(user.id)
+    issued = store.request_password_reset("OWNER@example.com")
+    assert issued is not None
+    _, token = issued
+    assert store.reset_password(token, "a new sufficiently long password") is True
+    assert store.authenticate("owner@example.com", "a new sufficiently long password") is not None
+    assert store.authenticate("owner@example.com", "a sufficiently long password") is None
+    assert store.reset_password(token, "another sufficiently long password") is False
+    store.close()
+
+
 def test_normalize_email_is_stable():
     assert normalize_email("  User@Example.COM ") == "user@example.com"
 

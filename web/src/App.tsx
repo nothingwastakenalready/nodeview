@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { Dashboard } from "./Dashboard";
-import { LoginPage } from "./LoginPage";
+import { LoginPage, PasswordResetPage } from "./LoginPage";
 import type { ServiceState } from "./model";
 
 const refreshMs = 5000;
@@ -59,8 +59,11 @@ export function App() {
   }, []);
 
   if (route === "#/login" || route === "#/register" || authenticated === false) {
+    if (route.startsWith("#/reset")) return <PasswordResetPage />;
     return <LoginPage register={route === "#/register"} onAuthenticated={() => { setAuthenticated(true); window.location.hash = "#/dashboard"; }} />;
   }
+
+  if (route.startsWith("#/reset")) return <PasswordResetPage />;
 
   if (authenticated === null) return <div className="boot-state">checking session.</div>;
 

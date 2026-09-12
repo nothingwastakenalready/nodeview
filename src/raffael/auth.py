@@ -131,6 +131,36 @@ class AuthStore:
             session.commit()
         return raw
 
+    def request_password_reset(self, email: str) -> tuple[UserRow, str] | None:
+        """Issue a single-use password reset token for an existing account."""
+        normalized = normalize_email(email)
+        with Session(self.engine) as session:
+            user = session.scalar(select(UserRow).where(UserRow.email == normalized))
+            if user is None:
+                return None
+            raw = secrets.token_urlsafe(32)
+            now = datetime.now(timezone.utc)
+            session.add(AuthTokenRow(user_id=user.id, purpose="password_reset", token_digest=session_digest(raw), created_at=now, expires_at=now + timedelta(hours=1)))
+            session.commit()
+            session.refresh(user)
+            return user, raw
+
+    def reset_password(self, raw_token: str, password: str) -> bool:
+        now = datetime.now(timezone.utc)
+        with Session(self.engine) as session:
+            token = session.scalar(select(AuthTokenRow).where(AuthTokenRow.token_digest == session_digest(raw_token), AuthTokenRow.purpose == "password_reset"))
+            if token is None or token.consumed_at is not None or token.expires_at.replace(tzinfo=timezone.utc) <= now:
+                return False
+            user = session.get(UserRow, token.user_id)
+            if user is None:
+                return False
+            user.password_hash = hash_password(password)
+            token.consumed_at = now
+            for active in session.scalars(select(SessionRow).where(SessionRow.user_id == user.id, SessionRow.revoked_at.is_(None))):
+                active.revoked_at = now
+            session.commit()
+            return True
+
     def confirm_email(self, raw_token: str) -> bool:
         now = datetime.now(timezone.utc)
         with Session(self.engine) as session:

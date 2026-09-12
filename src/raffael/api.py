@@ -15,7 +15,7 @@ from .config import Service, load_services
 from .engine import MonitoringEngine
 from .history import HistoryStore, SqlAlchemyHistoryStore
 from .auth import AuthStore, CSRF_COOKIE, SESSION_COOKIE
-from .email_templates import confirmation_email, newsletter_confirmation_email
+from .email_templates import confirmation_email, newsletter_confirmation_email, password_reset_email
 from .households import DeviceStore, connector_catalog
 from .mailer import SmtpMailer
 
@@ -50,6 +50,15 @@ class AccountInput(BaseModel):
     password: str
     workspace_name: str = "default"
     newsletter_opt_in: bool = False
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    password: str
 
 
 class DeviceInput(BaseModel):
@@ -195,6 +204,34 @@ def create_app(
         response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=os.environ.get("RAFFAEL_SECURE_COOKIES", "0") == "1", samesite="lax", max_age=7 * 24 * 3600)
         response.set_cookie(CSRF_COOKIE, csrf, httponly=False, secure=os.environ.get("RAFFAEL_SECURE_COOKIES", "0") == "1", samesite="lax", max_age=7 * 24 * 3600)
         return {"id": user.id, "email": user.email, "workspaces": runtime_auth.memberships(user.id)}
+
+    @app.post("/auth/password-reset/request")
+    def request_password_reset(account: PasswordResetRequest):
+        if runtime_auth is None:
+            raise HTTPException(status_code=503, detail="authentication storage unavailable")
+        try:
+            result = runtime_auth.request_password_reset(account.email)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if result is not None and runtime_mailer.enabled:
+            user, token = result
+            public_url = os.environ.get("RAFFAEL_PUBLIC_URL", "http://127.0.0.1:8080").rstrip("/")
+            logo_url = f"{public_url}/assets/02-logo-varianten/logo-liquid-silver-weiss-transparent.png"
+            message = password_reset_email(recipient=user.email, reset_url=f"{public_url}/#/reset?token={token}", logo_url=logo_url)
+            runtime_mailer.send(user.email, message)
+        return {"status": "accepted"}
+
+    @app.post("/auth/password-reset/confirm")
+    def confirm_password_reset(account: PasswordResetConfirm):
+        if runtime_auth is None:
+            raise HTTPException(status_code=503, detail="authentication storage unavailable")
+        try:
+            valid = runtime_auth.reset_password(account.token, account.password)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not valid:
+            raise HTTPException(status_code=400, detail="invalid or expired reset token")
+        return {"status": "updated"}
 
     @app.get("/auth/me")
     def current_user(session_token: str | None = Cookie(None, alias=SESSION_COOKIE)):
