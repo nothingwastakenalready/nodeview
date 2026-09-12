@@ -116,6 +116,9 @@ v0.4 has started with durable measurement history. retention, uptime aggregation
 
 see `docs/architecture/product-vision.md`, `docs/architecture/roadmap.md` and `docs/architecture/ui.md` for the longer version.
 
+The reproducible Proxmox/Mini-PC hierarchy test is documented in
+`docs/architecture/proxmox-minipc-test.md`.
+
 ## dev
 
 ```bash
