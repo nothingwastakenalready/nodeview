@@ -70,6 +70,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   const [sourceImportMessage, setSourceImportMessage] = useState<string | null>(null);
   const [devices, setDevices] = useState<HouseholdDevice[]>([]);
   const [clients, setClients] = useState<HouseholdDevice[]>([]);
+  const managedDevices = devices.filter((device) => device.metadata.role !== "client");
   const draggedRef = useRef(false);
 
   useEffect(() => {
@@ -198,6 +199,49 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     const result = await response.json() as { created: number; updated: number };
     await refreshDevices();
     setSourceImportMessage(`${result.created} added, ${result.updated} updated`);
+  }
+
+  async function importDemoInfrastructure() {
+    setSourceImportMessage("adding infrastructure");
+    const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
+    const headers = { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}) };
+    const inventory = [
+      { name: "Proxmox pve", connector: "proxmox", endpoint: "https://192.168.1.20:8006", metadata: { role: "infrastructure", source: "website-demo" } },
+      { name: "CT 100 - pihole", connector: "icmp", endpoint: "192.168.80.10", metadata: { role: "service", source: "website-demo", proxmox_id: 100 } },
+      { name: "CT 101 - npm", connector: "icmp", endpoint: "192.168.80.11", metadata: { role: "service", source: "website-demo", proxmox_id: 101 } },
+      { name: "CT 102 - wireguard", connector: "icmp", endpoint: "192.168.80.12", metadata: { role: "service", source: "website-demo", proxmox_id: 102 } },
+      { name: "CT 103 - kleiderschrank", connector: "icmp", endpoint: null, metadata: { role: "service", source: "website-demo", proxmox_id: 103, state: "stopped" } },
+      { name: "CT 104 - aurelia", connector: "icmp", endpoint: "192.168.80.13", metadata: { role: "service", source: "website-demo", proxmox_id: 104 } },
+      { name: "CT 106 - warenkorb", connector: "icmp", endpoint: "192.168.1.85", metadata: { role: "service", source: "website-demo", proxmox_id: 106 } },
+      { name: "CT 107 - matterbridge", connector: "icmp", endpoint: "192.168.1.177", metadata: { role: "service", source: "website-demo", proxmox_id: 107 } },
+      { name: "VM 105 - raffael", connector: "icmp", endpoint: "192.168.1.147", metadata: { role: "infrastructure", source: "website-demo", proxmox_id: 105 } },
+      { name: "VM 200 - homeassistant", connector: "icmp", endpoint: null, metadata: { role: "service", source: "website-demo", proxmox_id: 200 } },
+      { name: "Raffael Web", connector: "generic", endpoint: "http://192.168.1.147:8080/health", metadata: { role: "service", source: "website-demo" } },
+    ];
+    let current = devices;
+    let created = 0;
+    try {
+      let parent = current.find((device) => device.name === "Proxmox pve");
+      if (!parent) {
+        const response = await fetch("/household/devices", { method: "POST", headers, body: JSON.stringify(inventory[0]) });
+        if (!response.ok) throw new Error("could not add Proxmox");
+        parent = await response.json() as HouseholdDevice;
+        current = [...current, parent];
+        created += 1;
+      }
+      for (const item of inventory.slice(1)) {
+        if (current.some((device) => device.name === item.name)) continue;
+        const response = await fetch("/household/devices", { method: "POST", headers, body: JSON.stringify({ ...item, parent_id: parent.id }) });
+        if (!response.ok) throw new Error(`could not add ${item.name}`);
+        const createdDevice = await response.json() as HouseholdDevice;
+        current = [...current, createdDevice];
+        created += 1;
+      }
+      setDevices(current);
+      setSourceImportMessage(`${created} infrastructure entries added`);
+    } catch (error) {
+      setSourceImportMessage(error instanceof Error ? error.message : "infrastructure import failed");
+    }
   }
 
   function parentName(parentId: number | null): string {
@@ -413,6 +457,19 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
           )}
         </section>
 
+        <section className="clients-section" aria-labelledby="devices-title">
+          <div className="panel-heading">
+            <div><p className="section-kicker">website-managed inventory</p><h2 id="devices-title">devices & services</h2></div>
+            <span className="panel-meta">{managedDevices.length} saved</span>
+          </div>
+          {managedDevices.length === 0 ? <div className="clients-empty">no infrastructure saved yet.</div> : (
+            <div className="clients-table" role="table" aria-label="Managed devices and services">
+              <div className="clients-row clients-row-head" role="row"><span role="columnheader">name</span><span role="columnheader">endpoint</span><span role="columnheader">parent</span><span role="columnheader">connector</span><span role="columnheader">status</span></div>
+              {managedDevices.map((device) => <div className="clients-row" role="row" key={device.id}><strong role="cell">{device.name}</strong><span role="cell">{device.endpoint || "not set"}</span><span role="cell">{parentName(device.parent_id)}</span><span role="cell">{device.connector}</span><span role="cell">{device.status}</span></div>)}
+            </div>
+          )}
+        </section>
+
         <footer className="workspace-footnote">raffael · local infrastructure · v0.6</footer>
 
         {showAddClient ? (
@@ -451,7 +508,8 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               <p className="section-kicker">raffael / sources</p>
               <h2 id="source-import-title">import clients</h2>
               <form className="client-dialog-form" onSubmit={importClientsFromSource}>
-                <label><span className="sr-only">source</span><select name="source" aria-label="source" defaultValue="unifi"><option value="unifi">unifi network</option><option value="api">generic api</option><option value="snmp">snmp targets</option></select></label>
+                <label><span className="sr-only">source</span><select name="source" aria-label="source" defaultValue="unifi"><option value="unifi">unifi network</option><option value="api">generic api</option><option value="snmp">snmp targets</option><option value="demo">Raffael test inventory</option></select></label>
+                <button className="client-dialog-submit" type="button" onClick={importDemoInfrastructure}><span>+</span> add test inventory</button>
                 <label><span className="sr-only">UniFi URL</span><input name="url" aria-label="UniFi URL" placeholder="https://192.168.1.1" /></label>
                 <label><span className="sr-only">UniFi site</span><input name="site" aria-label="UniFi site" placeholder="default" defaultValue="default" /></label>
                 <label><span className="sr-only">UniFi API key</span><input name="api_key" aria-label="UniFi API key" type="password" placeholder="API key (optional)" /></label>
