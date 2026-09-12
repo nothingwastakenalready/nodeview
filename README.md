@@ -20,6 +20,7 @@ there are obviously a hundred tools that do this already. i didn't want any of t
 - failure/recovery thresholds so one bad sample does not immediately become the apocalypse
 - first browser ui with a compact hexagon overview and current latency
 - docker because leaving a terminal open forever is stupid
+- local Mailpit inbox for safe email development
 
 ## run it locally
 
@@ -37,6 +38,16 @@ Then open:
 ```text
 http://127.0.0.1:8080
 ```
+
+For local email development, open the Mailpit inbox at:
+
+```text
+http://127.0.0.1:8025
+```
+
+Mailpit captures messages locally and does not deliver them to real recipients.
+See `docs/architecture/email-delivery.md` for Proton SMTP configuration and
+the planned confirmation/newsletter flows.
 
 The same process serves the API, scheduler and built UI. Compose still binds only to localhost by default. There is no auth yet, so changing that to a public bind would be a fairly creative decision.
 

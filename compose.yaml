@@ -6,6 +6,20 @@ services:
     volumes:
       - ./services.yaml:/config/services.yaml:ro
       - raffael-data:/data
+    environment:
+      RAFFAEL_MAIL_PROVIDER: ${RAFFAEL_MAIL_PROVIDER:-mailpit}
+      RAFFAEL_SMTP_HOST: ${RAFFAEL_SMTP_HOST:-mailpit}
+      RAFFAEL_SMTP_PORT: ${RAFFAEL_SMTP_PORT:-1025}
+      RAFFAEL_MAIL_FROM: ${RAFFAEL_MAIL_FROM:-no-reply@localhost}
+      RAFFAEL_PUBLIC_URL: ${RAFFAEL_PUBLIC_URL:-http://127.0.0.1:8080}
+    depends_on:
+      - mailpit
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "127.0.0.1:8025:8025"
     restart: unless-stopped
 
 volumes:
