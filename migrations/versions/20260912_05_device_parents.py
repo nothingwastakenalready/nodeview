@@ -10,6 +10,9 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # A failed SQLite batch migration can leave Alembic's temporary table
+    # behind. Remove it before retrying so the migration is self-healing.
+    op.execute("DROP TABLE IF EXISTS _alembic_tmp_devices")
     with op.batch_alter_table("devices", recreate="always") as batch:
         batch.add_column(sa.Column("parent_id", sa.Integer(), nullable=True))
         batch.create_index("ix_devices_parent_id", ["parent_id"])
