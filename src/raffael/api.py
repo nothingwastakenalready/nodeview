@@ -74,6 +74,10 @@ class DeviceInput(BaseModel):
     parent_id: int | None = None
 
 
+class DeviceRenameInput(BaseModel):
+    name: str
+
+
 class ClientInput(BaseModel):
     name: str
     endpoint: str | None = None
@@ -334,6 +338,23 @@ def create_app(
                 device.metadata,
                 device.parent_id,
             )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.patch("/household/devices/{device_id}")
+    def rename_household_device(
+        device_id: int,
+        device: DeviceRenameInput,
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
+        x_csrf_token: str | None = Header(None),
+    ):
+        _, workspace_id = current_workspace(session_token)
+        require_csrf(session_token, x_csrf_token or csrf_token)
+        if runtime_devices is None:
+            raise HTTPException(status_code=503, detail="device storage unavailable")
+        try:
+            return runtime_devices.rename(workspace_id, device_id, device.name)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

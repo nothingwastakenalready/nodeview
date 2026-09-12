@@ -81,6 +81,8 @@ body::before { opacity: .16; background-image: radial-gradient(#9fb9c7 .7px, tra
 .add-client-button { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--raff-cloud); cursor: pointer; font-size: 22px; line-height: 1; }
 .add-client-button:hover, .add-client-button:focus-visible { background: rgb(238 242 243 / 12%); color: var(--raff-gold); outline: none; }
 .source-import-button { min-height: 28px; padding: 0 10px; border: 1px solid #2a4052; border-radius: 999px; background: transparent; color: #b9c6cc; cursor: pointer; font-size: 10px; }
+.device-edit-button { margin-left: 7px; border: 0; border-bottom: 1px solid #496273; padding: 0; background: transparent; color: #8495a3; cursor: pointer; font-size: 9px; }
+.device-edit-button:hover { color: var(--raff-gold); border-color: var(--raff-gold); }
 .source-import-button:hover, .source-import-button:focus-visible { border-color: var(--raff-gold); color: var(--raff-gold); outline: none; }
 .panel-heading-actions { display: flex; align-items: center; gap: 12px; }
 .summary { gap: 8px; }

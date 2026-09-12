@@ -120,6 +120,20 @@ class DeviceStore:
             session.refresh(row)
             return serialize_device(row)
 
+    def rename(self, workspace_id: int, device_id: int, name: str) -> dict:
+        clean_name = name.strip()
+        if not clean_name or len(clean_name) > 160:
+            raise ValueError("device name required")
+        with Session(self.engine) as session:
+            row = session.scalar(select(DeviceRow).where(DeviceRow.id == device_id, DeviceRow.workspace_id == workspace_id))
+            if row is None:
+                raise ValueError("device not found")
+            row.name = clean_name
+            row.updated_at = datetime.now(timezone.utc)
+            session.commit()
+            session.refresh(row)
+            return serialize_device(row)
+
     def create_client(
         self,
         workspace_id: int,

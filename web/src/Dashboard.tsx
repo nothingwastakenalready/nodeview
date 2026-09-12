@@ -115,6 +115,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   const [discovered, setDiscovered] = useState<Array<{ address: string; hostname: string | null; open_ports: number[] }>>([]);
   const [addClientMessage, setAddClientMessage] = useState<string | null>(null);
   const [sourceImportMessage, setSourceImportMessage] = useState<string | null>(null);
+  const [editingDevice, setEditingDevice] = useState<HouseholdDevice | null>(null);
   const [devices, setDevices] = useState<HouseholdDevice[]>([]);
   const [clients, setClients] = useState<HouseholdDevice[]>([]);
   const managedDevices = devices.filter((device) => device.metadata.role !== "client");
@@ -289,6 +290,19 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     } catch (error) {
       setSourceImportMessage(error instanceof Error ? error.message : "infrastructure import failed");
     }
+  }
+
+  async function renameDevice(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingDevice) return;
+    const form = new FormData(event.currentTarget);
+    const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
+    const response = await fetch(`/household/devices/${editingDevice.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}) }, body: JSON.stringify({ name: form.get("name") }) });
+    if (!response.ok) return;
+    const updated = await response.json() as HouseholdDevice;
+    setDevices((current) => current.map((device) => device.id === updated.id ? updated : device));
+    setClients((current) => current.map((device) => device.id === updated.id ? updated : device));
+    setEditingDevice(null);
   }
 
   function parentName(parentId: number | null): string {
@@ -528,7 +542,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
           {managedDevices.length === 0 ? <div className="clients-empty">no infrastructure saved yet.</div> : (
             <div className="clients-table" role="table" aria-label="Managed devices and services">
               <div className="clients-row clients-row-head" role="row"><span role="columnheader">name</span><span role="columnheader">endpoint</span><span role="columnheader">parent</span><span role="columnheader">connector</span><span role="columnheader">status</span></div>
-              {managedDevices.map((device) => <div className="clients-row" role="row" key={device.id}><strong role="cell">{device.name}</strong><span role="cell">{device.endpoint || "not set"}</span><span role="cell">{parentName(device.parent_id)}</span><span role="cell">{device.connector}</span><span role="cell">{device.status}</span></div>)}
+              {managedDevices.map((device) => <div className="clients-row" role="row" key={device.id}><strong role="cell">{device.name}</strong><span role="cell">{device.endpoint || "not set"}</span><span role="cell">{parentName(device.parent_id)}</span><span role="cell">{device.connector}</span><span role="cell">{device.status} <button type="button" className="device-edit-button" onClick={() => setEditingDevice(device)} aria-label={`edit ${device.name}`}>edit</button></span></div>)}
             </div>
           )}
         </section>
@@ -583,6 +597,15 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                 <button className="client-dialog-submit" type="submit"><span>in</span> import clients</button>
                 {sourceImportMessage ? <p className="client-dialog-message" role="status">{sourceImportMessage}</p> : null}
               </form>
+            </section>
+          </div>
+        ) : null}
+        {editingDevice ? (
+          <div className="client-dialog-backdrop" role="presentation" onClick={() => setEditingDevice(null)}>
+            <section className="client-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-device-title" onClick={(event) => event.stopPropagation()}>
+              <button className="client-dialog-close" type="button" aria-label="close" onClick={() => setEditingDevice(null)}>×</button>
+              <p className="section-kicker">raffael / device</p><h2 id="edit-device-title">edit name</h2>
+              <form className="client-dialog-form" onSubmit={renameDevice}><label><span className="sr-only">name</span><input name="name" aria-label="name" defaultValue={editingDevice.name} autoFocus required /></label><button className="client-dialog-submit" type="submit"><span>save</span> name</button></form>
             </section>
           </div>
         ) : null}
