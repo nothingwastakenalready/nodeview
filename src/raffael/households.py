@@ -24,11 +24,15 @@ class ConnectorSpec:
 
 
 CONNECTORS = (
+    ConnectorSpec("snmp", "SNMP", "snmp v2c / v3", "lan probe", "network, printer, NAS and UPS telemetry"),
     ConnectorSpec("unifi", "UniFi", "local api", "network api", "network devices and clients"),
     ConnectorSpec("hue", "Philips Hue", "local bridge api", "mdns / bridge", "bridge and lights"),
     ConnectorSpec("proxmox", "Proxmox", "rest api", "manual endpoint", "nodes and virtual machines"),
     ConnectorSpec("windows-agent", "Windows", "local agent", "lan agent", "host telemetry"),
     ConnectorSpec("macos-agent", "macOS", "local agent", "lan agent", "host telemetry"),
+    ConnectorSpec("ssh", "SSH Linux", "ssh", "manual endpoint", "host telemetry and services"),
+    ConnectorSpec("docker", "Docker", "docker api", "manual endpoint", "containers and compose stacks"),
+    ConnectorSpec("icmp", "Ping", "icmp", "network scan", "latency, reachability and downtime"),
     ConnectorSpec("generic", "Generic service", "http / tcp", "manual endpoint", "custom health check"),
 )
 CONNECTOR_KEYS = {item.key for item in CONNECTORS}

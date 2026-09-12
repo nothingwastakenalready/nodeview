@@ -305,7 +305,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               <h2 id="add-client-title">new client</h2>
               <form className="client-dialog-form" onSubmit={addClient}>
                 <label><span className="sr-only">name</span><input name="name" aria-label="name" placeholder="name" autoFocus required /></label>
-                <label><span className="sr-only">connector</span><select name="connector" aria-label="connector" defaultValue="generic"><option value="generic">generic service</option><option value="unifi">unifi</option><option value="hue">philips hue</option><option value="proxmox">proxmox</option><option value="windows-agent">windows</option><option value="macos-agent">macos</option></select></label>
+                <label><span className="sr-only">connector</span><select name="connector" aria-label="connector" defaultValue="generic"><option value="generic">generic service</option><option value="icmp">ping / network</option><option value="snmp">SNMP</option><option value="unifi">unifi</option><option value="hue">philips hue</option><option value="proxmox">proxmox</option><option value="docker">docker</option><option value="ssh">SSH Linux</option><option value="windows-agent">windows</option><option value="macos-agent">macos</option></select></label>
                 <label><span className="sr-only">endpoint</span><input name="endpoint" aria-label="endpoint" placeholder="endpoint (optional)" /></label>
                 <button className="client-dialog-submit" type="submit"><span>+</span> add client</button>
                 {addClientMessage ? <p className="client-dialog-message" role="status">{addClientMessage}</p> : null}
