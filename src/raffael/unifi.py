@@ -61,7 +61,10 @@ def fetch_unifi_clients(config: dict | None = None) -> list[ImportedClient]:
             if urlparse(base_url).hostname == "api.ui.com" or console_id:
                 clients = fetch_cloud_clients(opener, base_url, site, api_key, console_id)
             else:
-                clients = get_json(opener, base_url, f"/proxy/network/api/s/{site}/stat/sta", api_key=api_key)
+                try:
+                    clients = get_json(opener, base_url, f"/proxy/network/api/s/{site}/stat/sta", api_key=api_key)
+                except UniFiImportError:
+                    clients = fetch_local_integration_clients(opener, base_url, site, api_key)
         else:
             login_response = request_json(
                 opener,
@@ -118,6 +121,21 @@ def fetch_cloud_clients(opener, base_url: str, site: str, api_key: str, console_
         f"/v1/connector/consoles/{console_id}/network/integration/v1/sites/{site}/clients",
         api_key=api_key,
     )
+
+
+def fetch_local_integration_clients(opener, base_url: str, site: str, api_key: str) -> dict:
+    """Use the versioned local Network Integration API and resolve site names."""
+    sites = get_json(opener, base_url, "/proxy/network/integration/v1/sites", api_key=api_key)
+    entries = sites.get("data") if isinstance(sites, dict) else None
+    if not isinstance(entries, list) or not entries:
+        raise UniFiImportError("unifi local API returned no sites")
+    match = next((row for row in entries if isinstance(row, dict) and (
+        row.get("id") == site or row.get("internalReference") == site or row.get("name") == site
+    )), entries[0])
+    site_id = clean_text(match.get("id")) or clean_text(match.get("internalReference"))
+    if not site_id:
+        raise UniFiImportError("unifi local API returned no site id")
+    return get_json(opener, base_url, f"/proxy/network/integration/v1/sites/{site_id}/clients", api_key=api_key)
 
 
 def request_json(opener, base_url: str, path: str, payload: dict) -> dict:

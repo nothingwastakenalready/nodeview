@@ -454,9 +454,8 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                 <label><span className="sr-only">source</span><select name="source" aria-label="source" defaultValue="unifi"><option value="unifi">unifi network</option><option value="api">generic api</option><option value="snmp">snmp targets</option></select></label>
                 <label><span className="sr-only">UniFi URL</span><input name="url" aria-label="UniFi URL" placeholder="https://192.168.1.1" /></label>
                 <label><span className="sr-only">UniFi site</span><input name="site" aria-label="UniFi site" placeholder="default" defaultValue="default" /></label>
-                <label><span className="sr-only">UniFi console ID</span><input name="console_id" aria-label="UniFi console ID" placeholder="Console-ID (Cloud Connector, optional)" /></label>
                 <label><span className="sr-only">UniFi API key</span><input name="api_key" aria-label="UniFi API key" type="password" placeholder="API key (optional)" /></label>
-                <p className="client-dialog-message">API key wird bevorzugt; alternativ Benutzername und Passwort.</p>
+                <p className="client-dialog-message">Raffael erkennt lokale UniFi-API und Site automatisch.</p>
                 <label><span className="sr-only">UniFi username</span><input name="username" aria-label="UniFi username" placeholder="username (optional)" /></label>
                 <label><span className="sr-only">UniFi password</span><input name="password" aria-label="UniFi password" type="password" placeholder="password (optional)" /></label>
                 <label><span className="sr-only">parent device</span><select name="parent_id" aria-label="parent device" defaultValue=""><option value="">no parent (root clients)</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name} · {device.connector}</option>)}</select></label>
