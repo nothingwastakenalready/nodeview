@@ -11,7 +11,7 @@ import os
 import ssl
 from http.cookiejar import CookieJar
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPCookieProcessor, HTTPSHandler, Request, build_opener
 
 from .client_sources import ClientSourceError, ImportedClient, clean_mac, clean_text
@@ -46,6 +46,7 @@ def fetch_unifi_clients(config: dict | None = None) -> list[ImportedClient]:
     password = clean_text(config.get("password")) or clean_text(os.environ.get("RAFFAEL_UNIFI_PASSWORD"))
     api_key = clean_text(config.get("api_key")) or clean_text(os.environ.get("RAFFAEL_UNIFI_API_KEY"))
     site = clean_text(config.get("site")) or clean_text(os.environ.get("RAFFAEL_UNIFI_SITE")) or "default"
+    console_id = clean_text(config.get("console_id")) or clean_text(os.environ.get("RAFFAEL_UNIFI_CONSOLE_ID"))
     if not base_url or (not api_key and (not username or not password)):
         raise UniFiImportError("unifi connection is not configured")
 
@@ -57,12 +58,10 @@ def fetch_unifi_clients(config: dict | None = None) -> list[ImportedClient]:
     opener = build_opener(*handlers)
     try:
         if api_key:
-            clients = get_json(
-                opener,
-                base_url,
-                f"/proxy/network/api/s/{site}/stat/sta",
-                api_key=api_key,
-            )
+            if urlparse(base_url).hostname == "api.ui.com" or console_id:
+                clients = fetch_cloud_clients(opener, base_url, site, api_key, console_id)
+            else:
+                clients = get_json(opener, base_url, f"/proxy/network/api/s/{site}/stat/sta", api_key=api_key)
         else:
             login_response = request_json(
                 opener,
@@ -93,6 +92,32 @@ def fetch_unifi_clients(config: dict | None = None) -> list[ImportedClient]:
         raise UniFiImportError("unifi clients response is invalid")
     normalized = [client for row in rows if isinstance(row, dict) and (client := normalize_unifi_client(row))]
     return sorted(normalized, key=lambda client: (client.name.lower(), client.endpoint or "", client.mac_address or ""))
+
+
+def fetch_cloud_clients(opener, base_url: str, site: str, api_key: str, console_id: str | None) -> dict:
+    """Fetch clients through UniFi's cloud connector, resolving host/site IDs when omitted."""
+    cloud_url = "https://api.ui.com"
+    if urlparse(base_url).hostname == "api.ui.com":
+        cloud_url = base_url.rstrip("/")
+    if not console_id:
+        sites = get_json(opener, cloud_url, "/v1/sites", api_key=api_key)
+        entries = sites.get("data") if isinstance(sites, dict) else None
+        if not isinstance(entries, list) or not entries:
+            raise UniFiImportError("unifi cloud returned no sites")
+        match = next((row for row in entries if isinstance(row, dict) and (
+            row.get("siteId") == site or row.get("id") == site or
+            (isinstance(row.get("meta"), dict) and row["meta"].get("name") == site)
+        )), entries[0])
+        console_id = clean_text(match.get("hostId"))
+        site = clean_text(match.get("siteId")) or site
+    if not console_id:
+        raise UniFiImportError("unifi cloud response has no console id")
+    return get_json(
+        opener,
+        cloud_url,
+        f"/v1/connector/consoles/{console_id}/network/integration/v1/sites/{site}/clients",
+        api_key=api_key,
+    )
 
 
 def request_json(opener, base_url: str, path: str, payload: dict) -> dict:

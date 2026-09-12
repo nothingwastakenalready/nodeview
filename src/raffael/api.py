@@ -86,6 +86,7 @@ class ClientInput(BaseModel):
 class IntegrationImportInput(BaseModel):
     url: str | None = None
     site: str | None = None
+    console_id: str | None = None
     username: str | None = None
     password: str | None = None
     api_key: str | None = None
