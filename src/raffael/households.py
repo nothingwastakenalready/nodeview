@@ -146,6 +146,65 @@ class DeviceStore:
             parent_id=parent_id,
         )
 
+    def upsert_client(
+        self,
+        workspace_id: int,
+        name: str,
+        endpoint: str | None = None,
+        mac_address: str | None = None,
+        connector: str = "icmp",
+        parent_id: int | None = None,
+        metadata: dict | None = None,
+    ) -> tuple[dict, bool]:
+        if connector not in CONNECTOR_KEYS:
+            raise ValueError("unsupported connector")
+        clean_name = name.strip()
+        if not clean_name or len(clean_name) > 160:
+            raise ValueError("device name required")
+        clean_endpoint = endpoint.strip() if endpoint else None
+        clean_metadata = normalize_metadata(metadata)
+        clean_metadata["role"] = "client"
+        clean_mac = None
+        if mac_address:
+            clean_mac = mac_address.strip().lower().replace("-", ":")
+            if not MAC_ADDRESS_RE.fullmatch(clean_mac):
+                raise ValueError("client mac address is invalid")
+            clean_metadata["mac_address"] = clean_mac
+
+        with Session(self.engine) as session:
+            if parent_id is not None:
+                parent = session.scalar(select(DeviceRow).where(DeviceRow.id == parent_id, DeviceRow.workspace_id == workspace_id))
+                if parent is None:
+                    raise ValueError("parent device not found")
+            rows = session.scalars(select(DeviceRow).where(DeviceRow.workspace_id == workspace_id)).all()
+            row = find_matching_client(rows, clean_endpoint, clean_mac)
+            now = datetime.now(timezone.utc)
+            created = row is None
+            if row is None:
+                row = DeviceRow(
+                    workspace_id=workspace_id,
+                    parent_id=parent_id,
+                    connector=connector,
+                    name=clean_name,
+                    endpoint=clean_endpoint,
+                    credential_ref=None,
+                    metadata_json=json.dumps(clean_metadata, separators=(",", ":")),
+                    status="pending",
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(row)
+            else:
+                row.name = clean_name
+                row.endpoint = clean_endpoint
+                row.connector = connector
+                row.parent_id = parent_id
+                row.metadata_json = json.dumps(merge_client_metadata(row.metadata_json, clean_metadata), separators=(",", ":"))
+                row.updated_at = now
+            session.commit()
+            session.refresh(row)
+            return serialize_device(row), created
+
 
 def serialize_device(row: DeviceRow) -> dict:
     try:
@@ -176,3 +235,30 @@ def normalize_metadata(metadata: dict | None) -> dict:
             raise ValueError("unsupported device role")
         clean_metadata["role"] = clean_role
     return clean_metadata
+
+
+def find_matching_client(rows: list[DeviceRow], endpoint: str | None, mac_address: str | None) -> DeviceRow | None:
+    for row in rows:
+        metadata = decode_metadata(row.metadata_json)
+        if metadata.get("role") != "client":
+            continue
+        if mac_address and metadata.get("mac_address") == mac_address:
+            return row
+        if endpoint and row.endpoint == endpoint:
+            return row
+    return None
+
+
+def merge_client_metadata(existing_json: str, incoming: dict) -> dict:
+    existing = decode_metadata(existing_json)
+    existing.update(incoming)
+    existing["role"] = "client"
+    return existing
+
+
+def decode_metadata(metadata_json: str) -> dict:
+    try:
+        metadata = json.loads(metadata_json or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return metadata if isinstance(metadata, dict) else {}

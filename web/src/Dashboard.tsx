@@ -63,9 +63,11 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
   const [showAddClient, setShowAddClient] = useState(false);
   const [showDiscover, setShowDiscover] = useState(false);
+  const [showSourceImport, setShowSourceImport] = useState(false);
   const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
   const [discovered, setDiscovered] = useState<Array<{ address: string; hostname: string | null; open_ports: number[] }>>([]);
   const [addClientMessage, setAddClientMessage] = useState<string | null>(null);
+  const [sourceImportMessage, setSourceImportMessage] = useState<string | null>(null);
   const [devices, setDevices] = useState<HouseholdDevice[]>([]);
   const [clients, setClients] = useState<HouseholdDevice[]>([]);
   const draggedRef = useRef(false);
@@ -164,6 +166,29 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     setClients((current) => [...current, created]);
     setDiscovered((current) => current.filter((candidate) => candidate.address !== item.address));
     setDiscoveryMessage("device added");
+  }
+
+  async function importClientsFromSource(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSourceImportMessage("importing clients");
+    const form = new FormData(event.currentTarget);
+    const source = String(form.get("source") || "unifi");
+    const parentId = form.get("parent_id");
+    const params = new URLSearchParams();
+    if (parentId) params.set("parent_id", String(parentId));
+    const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
+    const response = await fetch(`/integrations/${source}/clients/import${params.size ? `?${params.toString()}` : ""}`, {
+      method: "POST",
+      headers: csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {},
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => null) as { detail?: string } | null;
+      setSourceImportMessage(detail?.detail || "client import failed");
+      return;
+    }
+    const result = await response.json() as { created: number; updated: number };
+    await refreshDevices();
+    setSourceImportMessage(`${result.created} added, ${result.updated} updated`);
   }
 
   function parentName(parentId: number | null): string {
@@ -351,6 +376,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
             <div><p className="section-kicker">network inventory</p><h2 id="clients-title">clients</h2></div>
             <div className="panel-heading-actions">
               <span className="panel-meta">{clients.length} saved</span>
+              <button className="source-import-button" type="button" onClick={() => setShowSourceImport(true)}>import source</button>
               <button className="add-client-button" type="button" aria-label="add client" onClick={() => setShowAddClient(true)}>+</button>
             </div>
           </div>
@@ -406,6 +432,21 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               <form className="client-dialog-form" onSubmit={discover}><label><span className="sr-only">network</span><input name="network" aria-label="network" defaultValue="192.168.1.0/24" required /></label><button className="client-dialog-submit" type="submit">scan</button></form>
               {discoveryMessage ? <p className="client-dialog-message" role="status">{discoveryMessage}</p> : null}
               {discovered.length ? <div className="cluster-members">{discovered.map((item) => <span key={item.address}>{item.hostname || item.address}{item.open_ports.length ? ` · ${item.open_ports.join(", ")}` : ""}<button type="button" onClick={() => adopt(item)} aria-label={`add ${item.address}`}>+</button></span>)}</div> : null}
+            </section>
+          </div>
+        ) : null}
+        {showSourceImport ? (
+          <div className="client-dialog-backdrop" role="presentation" onClick={() => setShowSourceImport(false)}>
+            <section className="client-dialog" role="dialog" aria-modal="true" aria-labelledby="source-import-title" onClick={(event) => event.stopPropagation()}>
+              <button className="client-dialog-close" type="button" aria-label="close" onClick={() => setShowSourceImport(false)}>×</button>
+              <p className="section-kicker">raffael / sources</p>
+              <h2 id="source-import-title">import clients</h2>
+              <form className="client-dialog-form" onSubmit={importClientsFromSource}>
+                <label><span className="sr-only">source</span><select name="source" aria-label="source" defaultValue="unifi"><option value="unifi">unifi network</option><option value="api">generic api</option><option value="snmp">snmp targets</option></select></label>
+                <label><span className="sr-only">parent device</span><select name="parent_id" aria-label="parent device" defaultValue=""><option value="">no parent (root clients)</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name} · {device.connector}</option>)}</select></label>
+                <button className="client-dialog-submit" type="submit"><span>in</span> import clients</button>
+                {sourceImportMessage ? <p className="client-dialog-message" role="status">{sourceImportMessage}</p> : null}
+              </form>
             </section>
           </div>
         ) : null}

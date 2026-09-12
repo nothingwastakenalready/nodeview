@@ -8,6 +8,7 @@ from raffael.checks import CheckResult
 from raffael.config import Service
 from raffael.engine import MonitoringEngine
 from raffael.history import Measurement
+from raffael.client_sources import ImportedClient
 
 
 def test_health_does_not_run_checks(tmp_path):
@@ -160,6 +161,104 @@ def test_household_clients_reject_invalid_mac_address(tmp_path):
         )
 
         assert response.status_code == 400
+
+
+def test_unifi_client_import_upserts_clients(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    calls = 0
+
+    def fake_unifi_clients():
+        nonlocal calls
+        calls += 1
+        suffix = calls
+        return [
+            ImportedClient(
+                name=f"phone {suffix}",
+                endpoint="192.168.1.44",
+                mac_address="aa:bb:cc:dd:ee:44",
+                connector="unifi",
+                metadata={"role": "client", "source": "unifi", "unifi_essid": "home"},
+            ),
+            ImportedClient(
+                name="printer",
+                endpoint="192.168.1.80",
+                mac_address="aa:bb:cc:dd:ee:80",
+                connector="unifi",
+                metadata={"role": "client", "source": "unifi", "unifi_is_wired": True},
+            ),
+        ]
+
+    with TestClient(
+        create_app(
+            config_path=config,
+            database_url=f"sqlite:///{tmp_path / 'auth.db'}",
+            unifi_client_loader=fake_unifi_clients,
+        )
+    ) as client:
+        client.post("/auth/register", json={"email": "owner@example.com", "password": "a sufficiently long password"})
+        csrf = client.cookies.get("raffael_csrf")
+
+        first = client.post("/integrations/unifi/clients/import", headers={"X-CSRF-Token": csrf})
+        second = client.post("/integrations/unifi/clients/import", headers={"X-CSRF-Token": csrf})
+
+        assert first.status_code == 200
+        assert first.json()["created"] == 2
+        assert first.json()["updated"] == 0
+        assert second.status_code == 200
+        assert second.json()["created"] == 0
+        assert second.json()["updated"] == 2
+
+        clients = client.get("/household/clients")
+        assert clients.status_code == 200
+        assert len(clients.json()) == 2
+        assert {item["name"] for item in clients.json()} == {"phone 2", "printer"}
+        assert all(item["connector"] == "unifi" for item in clients.json())
+
+
+def test_client_import_rejects_sources_without_adapter(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    with TestClient(create_app(config_path=config, database_url=f"sqlite:///{tmp_path / 'auth.db'}")) as client:
+        client.post("/auth/register", json={"email": "owner@example.com", "password": "a sufficiently long password"})
+        csrf = client.cookies.get("raffael_csrf")
+
+        response = client.post("/integrations/netbox/clients/import", headers={"X-CSRF-Token": csrf})
+
+        assert response.status_code == 400
+        assert "not implemented yet" in response.json()["detail"]
+
+
+def test_generic_source_client_import_uses_same_endpoint(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+
+    def fake_api_clients():
+        return [
+            ImportedClient(
+                name="nas",
+                endpoint="192.168.1.30",
+                mac_address="aa:bb:cc:dd:ee:30",
+                connector="generic",
+                metadata={"role": "client", "source": "api", "api_vendor": "example"},
+            )
+        ]
+
+    with TestClient(
+        create_app(
+            config_path=config,
+            database_url=f"sqlite:///{tmp_path / 'auth.db'}",
+            client_source_loaders={"api": fake_api_clients},
+        )
+    ) as client:
+        client.post("/auth/register", json={"email": "owner@example.com", "password": "a sufficiently long password"})
+        csrf = client.cookies.get("raffael_csrf")
+
+        response = client.post("/integrations/api/clients/import", headers={"X-CSRF-Token": csrf})
+
+        assert response.status_code == 200
+        assert response.json()["created"] == 1
+        assert response.json()["clients"][0]["metadata"]["source"] == "api"
 
 
 def test_services_returns_shared_check_results(tmp_path):

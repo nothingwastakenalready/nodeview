@@ -15,12 +15,15 @@ from .config import Service, load_services
 from .engine import MonitoringEngine
 from .history import HistoryStore, SqlAlchemyHistoryStore
 from .auth import AuthStore, CSRF_COOKIE, SESSION_COOKIE
+from .client_sources import ClientSourceError, ImportedClient, fetch_api_clients, fetch_snmp_clients
 from .email_templates import confirmation_email, newsletter_confirmation_email, password_reset_email
 from .households import DeviceStore, connector_catalog
 from .connectors import discover_network
 from .mailer import SmtpMailer
+from .unifi import fetch_unifi_clients
 
 Checker = Callable[[Service], CheckResult]
+ClientSourceLoader = Callable[[], list[ImportedClient]]
 
 
 class ServiceInput(BaseModel):
@@ -108,6 +111,8 @@ def create_app(
     history: HistoryStore | None = None,
     database_url: str | None = None,
     mailer: SmtpMailer | None = None,
+    client_source_loaders: dict[str, ClientSourceLoader] | None = None,
+    unifi_client_loader: ClientSourceLoader | None = None,
 ) -> FastAPI:
     path = Path(config_path or os.environ.get("RAFFAEL_CONFIG", "/config/services.yaml"))
     runtime_engine = engine
@@ -115,6 +120,13 @@ def create_app(
     runtime_auth: AuthStore | None = None
     runtime_devices: DeviceStore | None = None
     runtime_mailer = mailer or SmtpMailer()
+    runtime_client_source_loaders = {
+        "unifi": unifi_client_loader or fetch_unifi_clients,
+        "api": fetch_api_clients,
+        "snmp": fetch_snmp_clients,
+    }
+    if client_source_loaders:
+        runtime_client_source_loaders.update(client_source_loaders)
     ui_root = Path(ui_path or os.environ.get("RAFFAEL_UI", "/app/web/dist"))
 
     @asynccontextmanager
@@ -344,6 +356,47 @@ def create_app(
                 parent_id=client.parent_id,
                 metadata=client.metadata,
             )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/integrations/{source}/clients/import")
+    def import_clients_from_source(
+        source: str,
+        parent_id: int | None = None,
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
+        x_csrf_token: str | None = Header(None),
+    ):
+        _, workspace_id = current_workspace(session_token)
+        require_csrf(session_token, x_csrf_token or csrf_token)
+        if runtime_devices is None:
+            raise HTTPException(status_code=503, detail="device storage unavailable")
+        source_loader = runtime_client_source_loaders.get(source)
+        if source_loader is None:
+            raise HTTPException(status_code=400, detail=f"{source} client import is not implemented yet")
+        try:
+            imported_clients = source_loader()
+            created = 0
+            updated = 0
+            devices = []
+            for client in imported_clients:
+                device, was_created = runtime_devices.upsert_client(
+                    workspace_id,
+                    client.name,
+                    endpoint=client.endpoint,
+                    mac_address=client.mac_address,
+                    connector=client.connector,
+                    parent_id=parent_id,
+                    metadata=client.metadata,
+                )
+                devices.append(device)
+                if was_created:
+                    created += 1
+                else:
+                    updated += 1
+            return {"created": created, "updated": updated, "clients": devices}
+        except ClientSourceError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
