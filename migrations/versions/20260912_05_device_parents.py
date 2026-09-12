@@ -10,12 +10,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("devices", sa.Column("parent_id", sa.Integer(), nullable=True))
-    op.create_index("ix_devices_parent_id", "devices", ["parent_id"])
-    op.create_foreign_key("fk_devices_parent_id", "devices", "devices", ["parent_id"], ["id"], ondelete="SET NULL")
+    with op.batch_alter_table("devices", recreate="always") as batch:
+        batch.add_column(sa.Column("parent_id", sa.Integer(), nullable=True))
+        batch.create_index("ix_devices_parent_id", ["parent_id"])
+        batch.create_foreign_key("fk_devices_parent_id", "devices", ["parent_id"], ["id"], ondelete="SET NULL")
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_devices_parent_id", "devices", type_="foreignkey")
-    op.drop_index("ix_devices_parent_id", table_name="devices")
-    op.drop_column("devices", "parent_id")
+    with op.batch_alter_table("devices", recreate="always") as batch:
+        batch.drop_constraint("fk_devices_parent_id", type_="foreignkey")
+        batch.drop_index("ix_devices_parent_id")
+        batch.drop_column("parent_id")
