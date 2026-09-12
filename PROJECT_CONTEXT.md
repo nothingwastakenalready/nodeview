@@ -1,248 +1,324 @@
-# raffael project context
+# raffael — project and git context
 
-Read this first when continuing raffael in a new session.
+This document is reference context, not a new instruction. The user's current
+request always takes precedence.
 
-## what this is
+Snapshot: 2026-09-12, Europe/Berlin.
 
-Raffael is becoming a self-hosted, open-source infrastructure monitoring and observability application. It started as a small Python HTTP/TCP checker. Do not rewrite the working core just to make the project look bigger.
+## canonical project
 
-The product should answer quickly:
+- Product and repository: **raffael**
+- GitHub: https://github.com/nothingwastakenalready/raffael
+- GitHub username used locally: `Local240`
+- Default branch: `main`
+- Local checkout:
+  `/Users/loneroza/Documents/Codex/2026-09-12/hi/work/nodeview`
+- Implementation baseline before this context refresh: `cf331dc`
+  (`refine transactional email design`)
+- The remote is synchronized with `main`.
+- Private runtime files such as `services.yaml`, credentials and databases must
+  not be committed.
 
-1. what is broken?
-2. what is getting worse?
-3. what is probably causing it?
+## product in one paragraph
 
-The long-term product is multi-user and workspace-based, with a browser UI and later a desktop client and remote agents.
+Raffael is a self-hosted, open-source monitoring and observability application
+for a home, homelab or small private infrastructure. It should answer what is
+broken, what is getting worse and what is likely affected. The intended model
+is workspace-first:
 
-## visual/product decisions already made
+`user -> membership -> workspace -> devices/nodes -> services -> checks -> measurements/events`
 
-- Raffael must not become a Checkmk clone
-- Checkmk is only one reference for dense operational scanning and host/service status semantics
-- broader visual inspiration should also come from Uptime Kuma, Gatus, Beszel, Netdata, Grafana, Datadog, New Relic, Honeycomb/SigNoz-style observability tools, Docker/infrastructure visualizers and modern developer tools like Linear/Vercel/Raycast
-- primary infrastructure overview currently uses hexagonal tiles, but the hexagon is a motif, not a permanent constraint
-- light, calm application canvas with restrained technical surfaces; dark mode can follow later
-- density model: overview is compact, topology medium-density, detail spacious
-- monitoring color spectrum: healthy / warning / critical / unknown / pending, with later `affected` for topology-derived downstream impact
-- do not copy any product's exact layout, colors, icons, spacing or component shapes one-to-one
-- quiet tile interiors with stronger status perimeter/ring are preferred over fully saturated tiles
-- status must remain understandable without color alone
-- current health and latency should be visible at a glance
-- latency is a first-class metric and gets history graphs once persistence exists
-- node detail later includes services, events, uptime, latency history and agent telemetry
-- dependency/topology graph is a core future feature
-- dependency state can mark downstream systems `affected`; do not claim causal certainty
-- UI should feel like a real internal infrastructure tool, not a landing page, fake terminal, cyberpunk poster or generic admin template
-- repo/UI copy stays short, dry and functional
+The current product is a working local preview, not a finished public release.
 
-## UI identity target
+## current local runtime
 
-Raffael should feel technical, restrained, fast to read, slightly opinionated and self-hosted-native.
+Docker Desktop is installed and working. The active Compose stack contains:
 
-The first UI shell is allowed to be imperfect. Its job is to make the running monitor visible. Future UI work should create a distinct Raffael design language rather than polishing the current shell into a Checkmk-adjacent clone.
+- Raffael at http://127.0.0.1:8080
+- Mailpit at http://127.0.0.1:8025
+- SQLite in the persistent `raffael-data` Docker volume
+- a local ignored `services.yaml`
 
-Core UI principles:
+The stack binds to `127.0.0.1` and is therefore not exposed directly to the
+LAN or internet.
 
-1. status first, decoration second
-2. latency is not a secondary footnote
-3. topology is explanatory, not ornamental
-4. overview is for orientation; detail is for thinking
-5. never use fake data just to make the UI look fuller
-6. keep the interface calm until something actually needs attention
-
-## reference products
-
-- Checkmk: host/service model, dense state overview, status semantics
-- Uptime Kuma: low-friction onboarding/self-hosting, clear uptime status feel
-- Gatus: simple active-check/threshold mental model, config-as-code health checks
-- Beszel/Netdata: lightweight host telemetry, calm server-health dashboards, hub + agent direction
-- Grafana: time-series/dashboard reading patterns and composable visual panels, not a thing to clone
-- Datadog/New Relic: drill-down, incident context, correlation and dashboard interaction patterns
-- Honeycomb/SigNoz-style tools: event-first investigation and later observability navigation ideas
-- Docker/infrastructure visualizers: live topology and object relationship maps
-- Linear/Vercel/Raycast-style developer tools: restrained modern technical polish and low visual noise
-
-Raffael should combine useful ideas without becoming a clone of any of them.
-
-## data model direction
-
-Use a workspace-first model:
-
-user -> membership -> workspace -> nodes -> services -> checks -> measurements/events
-
-Dependencies connect nodes/services. All tenant-owned data belongs to exactly one workspace. Roles are initially owner/admin/member/viewer.
-
-Multi-user is planned early enough that tenant isolation does not become a retrofit across the whole codebase.
-
-Important current UI limitation: v0.3 does not yet have the final node/workspace model, so the first browser UI temporarily renders each monitored service as one overview hexagon. Do not build product logic around that shortcut. Migrate overview tiles to real nodes once the backend model exists.
-
-## security decisions
-
-Security is a parallel workstream, not a final polish step.
-
-Important boundaries:
-
-- server-side authorization for every workspace-owned object
-- explicit cross-workspace regression tests
-- local auth direction: Argon2id password hashing + server-side sessions + Secure/HttpOnly/SameSite cookies
-- CSRF/session rotation/revocation/rate limiting where applicable
-- OIDC/OAuth and 2FA later
-- monitoring creates an inherent SSRF/egress risk because users choose network targets
-- trusted self-hosted mode may allow private networks; hosted/untrusted mode needs strict egress/target policy
-- account for redirects, DNS rebinding, loopback, link-local and metadata endpoints
-- no arbitrary remote command execution in the agent design
-- least-privilege agents, authenticated enrollment, credential rotation/revocation
-- secrets must not appear in examples/logs/public APIs
-- desktop credentials eventually use OS credential storage
-
-Continuous scheduling increases the importance of SSRF/egress controls because configured targets are contacted repeatedly. Until target-policy hardening and auth/tenant isolation exist, Raffael remains trusted/self-hosted and should not be exposed to untrusted users.
-
-Before a serious public release: threat model, security review/pentest, security regression tests, dependency/static/secret/container scanning, SECURITY.md, private vulnerability reporting path, OpenSSF review. An independent human review is still desirable before a security-sensitive 1.0.
-
-## technology direction
-
-Backend:
-
-- Python 3.11+
-- FastAPI API
-- asyncio in-process scheduler for the current single-server architecture
-- synchronous protocol checks executed through `asyncio.to_thread()` so they do not block the event loop
-- Pydantic at boundaries
-- SQLAlchemy + Alembic once persistence arrives
-- SQLite for easy small/development installs where appropriate
-- PostgreSQL for serious multi-user deployments
-- pytest / TDD for behavior changes
-- Docker Compose first-class deployment
-
-Frontend now exists as a deliberately small shell:
-
-- React 19.3
-- TypeScript
-- Vite 8.x
-- Vitest 5
-- plain CSS for now
-- same-origin production deployment: frontend is compiled in Docker and served by FastAPI
-- local design iteration can use the Vite dev server with API proxying
-- no component framework yet because the visual language is still expected to evolve in Codex
-
-Frontend later:
-
-- dedicated chart library for time series
-- topology graph library chosen only after interaction requirements are specified
-
-Desktop later:
-
-- Tauri 2 direction
-- reuse web frontend
-- first desktop mode connects to an existing Raffael server; do not bundle the whole backend initially
-
-## development order
-
-Detailed roadmap: `docs/architecture/roadmap.md`.
-
-Immediate sequence:
-
-1. v0.2 always-on API + Docker — implemented
-2. v0.3 scheduler/state engine — implemented
-3. first browser UI shell — implemented after v0.3, intentionally before persistence so the project can be inspected locally
-4. v0.4 persistence/history/latency — in progress; durable measurements and history API implemented first
-5. proper node/workspace model + richer web UI
-6. accounts/workspaces/tenant isolation
-7. real node overview with its own visual language
-8. dependency graph
-9. agent
-10. alerting/operations
-11. Prometheus/interoperability
-12. desktop client
-13. 1.0 open-source hardening/release quality
-
-Do not jump directly to pretty topology before the monitoring state engine/history and real dependency data are trustworthy.
-
-## current state — 2026-09-12
-
-Raffael replaces the former project name across product, package, API and documentation. v0.4 has started on top of the v0.3 monitoring engine.
-
-Implemented backend behavior:
-
-- existing HTTP/TCP checks remain the protocol core
-- each configured service can define `interval`, `failure_threshold`, and `success_threshold`
-- defaults: 30 second interval, 2 failures to become critical, 1 success to recover
-- services start in `pending`
-- successful checks become `up`
-- failures before the configured failure threshold become `warning`
-- threshold-reaching failures become `critical`
-- unexpected checker/engine exceptions become `unknown` instead of killing the scheduler
-- recovery can require multiple consecutive successes
-- success/failure counters reset each other
-- each service has an asyncio scheduling loop
-- synchronous checks run via `asyncio.to_thread()`
-- a shared semaphore bounds concurrent checks; default max concurrency is 10
-- engine start avoids duplicate service loops
-- engine stop cancels and awaits scheduler tasks cleanly
-- FastAPI lifespan starts/stops the default engine
-- `GET /state` exposes the current in-memory state
-- `/health`, `/services`, and `/check` keep their earlier meanings
-
-First browser UI shell:
-
-- compact first dashboard shell; a light redesign is now the target
-- summary counts for healthy/warning/critical/unknown/pending
-- hexagonal overview tiles showing service name, current latency and readable status
-- selected-service detail with last check, HTTP status, streak counters and last error
-- 5-second `/state` refresh
-- loading, empty, stale/error states
-- accessible button semantics, focus state and reduced-motion support
-- frontend unit/render tests in CI
-- production frontend compiled through a Node Docker stage and served from the same FastAPI container
-- Compose remains a single service and localhost-only by default
-
-Current operational state remains intentionally in-memory and resets to pending after restart. Scheduled check measurements now persist in SQLite through a SQLAlchemy boundary, with an initial Alembic migration and bounded UTC time-range API. There is no uptime calculation, retention job, state-change event table, alerting, authentication, final node/workspace model or dependency topology yet.
-
-The browser UI now has a dark modular operations-console direction. It uses live-derived overview widgets for healthy percentage, attention count and selected latency, plus the existing service status overview and detail panel. A login page exists as a visual route at `#/login`; it does not claim successful authentication until the backend auth slice is connected.
-
-The first backend auth slice now provides local registration, Argon2id password hashing, server-side sessions, CSRF-protected logout, an owner membership in a default workspace, and authentication gates on service/state/history reads when database-backed auth is enabled. YAML monitor configuration is still shared self-hosted data rather than independently workspace-owned; a later model must add explicit workspace ownership before recommending internet-facing multi-tenant deployment.
-
-The remaining v0.4 work is state-change events, retention and uptime calculation. Keep the slice narrow; Raffael is not a general-purpose TSDB.
-
-## local inspection
-
-The intended local flow is:
+Start or rebuild it with this complete command:
 
 ```bash
-git clone https://github.com/nothingwastakenalready/raffael.git
-cd raffael
-cp services.example.yaml services.yaml
-docker compose up -d --build
+cd "/Users/loneroza/Documents/Codex/2026-09-12/hi/work/nodeview" && docker compose up -d --build
 ```
 
-Open `http://127.0.0.1:8080`.
+Stop it with:
 
-For UI iteration in Codex/local dev, run the backend on port 8080 and then `cd web && npm install && npm run dev`.
+```bash
+cd "/Users/loneroza/Documents/Codex/2026-09-12/hi/work/nodeview" && docker compose down
+```
 
-## working method
+## technology
 
-For substantial slices:
+- Python 3.11+ / FastAPI
+- SQLAlchemy 2 / Alembic / SQLite
+- asyncio scheduler with bounded concurrency
+- Argon2id password hashing and server-side sessions
+- React 19 / TypeScript / Vite / Vitest
+- Docker Compose
+- Mailpit for local SMTP preview
+- PostgreSQL remains the direction for serious multi-user installations
 
-1. focused design spec
-2. implementation plan
-3. TDD: test -> observe RED -> minimal implementation -> GREEN -> refactor
-4. fresh verification
-5. CI
-6. security impact review
-7. docs
-8. coherent version/release
+## implemented backend
 
-Keep commits human and slightly dry/understated. Avoid marketing language and fake activity. The code should be technically clean even if the repo voice is a little loose.
+### monitoring
 
-## canonical docs
+- YAML-configured HTTP and TCP checks
+- continuous scheduling with per-service intervals
+- bounded concurrent checks
+- states: `pending`, `up`, `warning`, `critical`, `unknown`
+- failure and recovery thresholds
+- latency, response status, streaks and error details
+- scheduler exceptions become `unknown` instead of killing the loop
+- graceful engine startup and shutdown
+- `GET /health`, `GET /services`, `POST /check`, `GET /state`
 
-- `PROJECT_CONTEXT.md` — fast handoff/current decisions
-- `docs/architecture/product-vision.md` — long-term architecture/product/security direction
-- `docs/architecture/roadmap.md` — staged development streams
-- `docs/architecture/ui.md` — current UI direction and Codex handoff
-- `docs/superpowers/specs/2026-09-10-raffael-v0.2-design.md` — v0.2 design
-- `docs/superpowers/specs/2026-09-11-raffael-v0.3-design.md` — scheduler/state-engine design
-- `docs/superpowers/plans/2026-09-11-raffael-v0.3.md` — v0.3 implementation plan
-- `docs/superpowers/specs/2026-09-11-raffael-ui-shell-design.md` — first browser UI shell design
-- `docs/superpowers/plans/2026-09-11-raffael-ui-shell.md` — UI shell implementation plan
+### persistence
 
-If a future conversation is missing context, read these files before proposing architecture changes.
+- append-only measurement history in SQLite
+- SQLAlchemy persistence boundary
+- Alembic migrations
+- bounded UTC history endpoint:
+  `GET /history/{service_name}`
+- history survives application restarts
+
+### authentication and workspaces
+
+- local account registration
+- Argon2id password hashes
+- server-side session records
+- HttpOnly session cookie
+- separate CSRF cookie and CSRF-protected logout
+- `GET /auth/me`
+- an owner membership and workspace on registration
+- authentication gates around service, state and history reads when database
+  auth is active
+- email-verification token flow with single-use token digests
+- separate newsletter double opt-in
+
+### household client foundation
+
+The integration catalog currently exposes:
+
+- UniFi
+- Philips Hue
+- Proxmox
+- Windows agent
+- macOS agent
+- generic HTTP/TCP
+
+The API can list and create workspace-owned pending device records:
+
+- `GET /integrations/catalog`
+- `GET /household/devices`
+- `POST /household/devices`
+
+This is a storage and onboarding boundary. Real discovery, credential exchange
+and telemetry adapters are not implemented yet.
+
+## implemented frontend
+
+- same-origin frontend served by FastAPI
+- minimal two-step login: email first, password after Enter
+- registration page with optional newsletter consent
+- Raffael liquid-silver logo assets
+- dark, lowercase dashboard direction
+- star-field client constellation at the top
+- real monitored services shown as status-colored line-art stars
+- client name shown on each star; details appear through selection
+- draggable star positions
+- positions stored in browser `localStorage`
+- leave/reload warning after moving stars
+- current-state summaries and selected-monitor detail
+- status-derived clusters
+- add-client dialog using the household connector catalog direction
+- five-second state refresh and stale-state handling
+
+Current limitation: star layout is browser-local rather than saved per user and
+workspace on the server. The dirty-state prompt also needs refinement because
+positions are written to local storage immediately.
+
+## transactional email
+
+Local registration sends into Mailpit. Two separate messages exist:
+
+1. account verification;
+2. newsletter confirmation, only after explicit opt-in.
+
+The current design uses:
+
+- black canvas
+- centered transparent Raffael PNG
+- lowercase copy
+- one heading and one underlined action
+- no recipient details in the HTML body
+- no provisional tagline
+
+The phrase `raffael · local infrastructure` was removed. The public product
+descriptor is intentionally undecided.
+
+Production email is not active. The intended later path is Proton SMTP with a
+custom domain and a dedicated sender such as `no-reply@domain.tld`. Never
+commit the Proton SMTP token or account password.
+
+## visual decisions
+
+- Raffael must have its own identity and must not become a Checkmk clone.
+- The dashboard direction is currently black, open, border-light and spatial.
+- The constellation is the visual header and may impress, but it must use real
+  clients rather than invented objects.
+- Real graphs, clusters and operational details live below it.
+- Status colors should use a restrained Raffael-inspired palette while remaining
+  understandable without color alone.
+- UI text should be lowercase wherever grammar and accessibility allow.
+- The Raffael liquid-silver mark is the canonical logo.
+- Avoid fake telemetry, generic admin templates, cyberpunk clutter and
+  decorative topology that claims relationships the backend does not know.
+- Interaction should stay on one page where possible; details should open
+  through hover, selection, drawers or overlays.
+
+Canonical logo assets:
+
+- `web/public/assets/02-logo-varianten/logo-liquid-silver-weiss-transparent.png`
+- `web/public/assets/02-logo-varianten/logo-liquid-silver-schwarz-transparent.png`
+
+## verification status
+
+The latest verified local state produced:
+
+- Docker production image build passed
+- Vite production build passed inside Docker
+- application health check returned `{"status":"ok"}`
+- Mailpit health and SMTP delivery passed
+- account and newsletter test messages arrived
+- transparent logo rendered correctly in Mailpit
+- full Python suite: **54 passed**
+- two upstream Starlette/httpx deprecation warnings remain
+- one harmless pytest cache warning occurred because the test mount was
+  intentionally read-only
+
+## today’s pushed sequence
+
+- `194ffe3 add household connector foundation`
+- `07211e6 document local email delivery`
+- `cad07af add email verification and newsletter opt-in`
+- `92ce1e8 reduce docker build context`
+- `cf331dc refine transactional email design`
+
+Earlier relevant baseline:
+
+- `b2ca8d2 raffael remembers what happened`
+
+## security posture
+
+Raffael is suitable for trusted local development and continued open-source
+review, but it is not ready for direct public internet exposure.
+
+Existing safeguards:
+
+- localhost-only Compose ports
+- Argon2id password hashing
+- server-side sessions
+- CSRF-protected logout
+- single-use email token digests
+- workspace membership model
+- non-root application container
+- secrets excluded from examples and public API responses
+
+Required before an internet-facing release:
+
+- workspace ownership for all monitor/service/history data
+- cross-workspace authorization tests across every owned object
+- login and resend rate limiting
+- password reset and session-management UI
+- strict SSRF/egress policy for user-defined monitoring targets
+- redirect, DNS-rebinding, loopback, link-local and metadata protections
+- retention limits and storage-failure behavior
+- dependency, secret, static and container scanning
+- threat model, security review and public `SECURITY.md`
+- an independent human review before a security-sensitive 1.0
+
+## known unfinished work
+
+- real UniFi, Hue and Proxmox connector runtimes
+- secure agent enrollment for Windows and macOS
+- reviewed LAN discovery instead of blind automatic enrollment
+- real topology data, inferred relationships and affected-state semantics
+- server-side constellation layout persistence
+- state-change event table
+- uptime aggregation
+- measurement retention
+- alerting and notifications
+- PostgreSQL deployment path
+- polished charts and history consumption in the UI
+- final product descriptor/tagline
+- version consistency: package reports `0.4.0`, while one dashboard footer
+  currently says `v0.6`
+- production domain and production mail delivery
+
+## deployment direction
+
+The intended permanent host is the user's Proxmox mini PC.
+
+Recommended shape:
+
+1. a small Debian VM on Proxmox;
+2. Docker Compose inside the VM;
+3. 2 CPU cores, 2–4 GB RAM and roughly 20 GB disk to start;
+4. Proxmox snapshots/backups plus an application-data backup;
+5. local access first;
+6. remote private access through WireGuard or Tailscale;
+7. later a reverse proxy and HTTPS for a real domain.
+
+Do not expose port `8080` directly to the internet. A later domain can point
+to a reverse proxy while the application and its data remain on Proxmox.
+
+## recommended next sequence
+
+1. create the documented Proxmox/Debian deployment profile and backup procedure;
+2. finish v0.4 reliability: retention, storage-failure handling, events and
+   uptime;
+3. connect household onboarding to real, least-privilege connector adapters;
+4. persist constellation layouts per workspace and add real topology edges;
+5. complete the internet-facing security gate before enabling a public domain.
+
+## collaboration preferences
+
+- communicate with the user in German
+- keep explanations short, concrete and easy to scan
+- write every terminal command as one complete copy-and-paste command, including
+  the project `cd`
+- test changes automatically and report actual results
+- preserve the existing documentation style
+- use small, coherent commits with normal human commit messages
+- push completed, verified slices to GitHub
+- keep the project open-source-reviewable and do not commit secrets
+- ADHD mode remains active until the user says `stop adhd mode` or
+  `normal mode`
+
+## canonical files
+
+- `PROJECT_CONTEXT.md` — this handoff and current memory
+- `docs/architecture/product-vision.md`
+- `docs/architecture/roadmap.md`
+- `docs/architecture/ui.md`
+- `docs/architecture/household-connectors.md`
+- `docs/architecture/email-delivery.md`
+- `src/raffael/api.py`
+- `src/raffael/auth.py`
+- `src/raffael/engine.py`
+- `src/raffael/history.py`
+- `src/raffael/email_templates.py`
+- `web/src/Dashboard.tsx`
+- `web/src/LoginPage.tsx`
+- `web/src/visual-overrides.css`
+
+When continuing in a fresh conversation, read this file first, then inspect
+`git status`, recent commits and the relevant architecture document before
+changing code.
