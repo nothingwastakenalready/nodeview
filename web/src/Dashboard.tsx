@@ -56,6 +56,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
   const [discovered, setDiscovered] = useState<Array<{ address: string; hostname: string | null; open_ports: number[] }>>([]);
   const [addClientMessage, setAddClientMessage] = useState<string | null>(null);
+  const [devices, setDevices] = useState<Array<{ id: number; name: string; connector: string; parent_id: number | null }>>([]);
   const draggedRef = useRef(false);
 
   useEffect(() => {
@@ -67,6 +68,13 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     window.addEventListener("beforeunload", warnBeforeLeave);
     return () => window.removeEventListener("beforeunload", warnBeforeLeave);
   }, [hasUnsavedLayout]);
+
+  useEffect(() => {
+    fetch("/household/devices")
+      .then((response) => response.ok ? response.json() : [])
+      .then((items: Array<{ id: number; name: string; connector: string; parent_id: number | null }>) => setDevices(items))
+      .catch(() => setDevices([]));
+  }, [showAddClient]);
 
   function positionFor(name: string, index: number): { x: number; y: number } {
     return positions[name] ?? constellationPosition(index, states.length);
@@ -99,6 +107,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
         connector: form.get("connector"),
         name: form.get("name"),
         endpoint: form.get("endpoint") || null,
+        parent_id: form.get("parent_id") ? Number(form.get("parent_id")) : null,
       }),
     });
     if (!response.ok) {
@@ -106,6 +115,8 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
       return;
     }
     setAddClientMessage("client added");
+    const created = await response.json() as { id: number; name: string; connector: string; parent_id: number | null };
+    setDevices((current) => [...current, created]);
     event.currentTarget.reset();
   }
 
@@ -118,6 +129,16 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     const results = await response.json() as Array<{ address: string; hostname: string | null; open_ports: number[] }>;
     setDiscovered(results);
     setDiscoveryMessage(`${results.length} devices found`);
+  }
+
+  async function adopt(item: { address: string; hostname: string | null; open_ports: number[] }) {
+    const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
+    const response = await fetch("/household/discover/adopt", { method: "POST", headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}) }, body: JSON.stringify(item) });
+    if (!response.ok) { setDiscoveryMessage("could not add device"); return; }
+    const created = await response.json() as { id: number; name: string; connector: string; parent_id: number | null };
+    setDevices((current) => [...current, created]);
+    setDiscovered((current) => current.filter((candidate) => candidate.address !== item.address));
+    setDiscoveryMessage("device added");
   }
 
   return (
@@ -307,6 +328,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                 <label><span className="sr-only">name</span><input name="name" aria-label="name" placeholder="name" autoFocus required /></label>
                 <label><span className="sr-only">connector</span><select name="connector" aria-label="connector" defaultValue="generic"><option value="generic">generic service</option><option value="icmp">ping / network</option><option value="snmp">SNMP</option><option value="unifi">unifi</option><option value="hue">philips hue</option><option value="proxmox">proxmox</option><option value="docker">docker</option><option value="ssh">SSH Linux</option><option value="windows-agent">windows</option><option value="macos-agent">macos</option></select></label>
                 <label><span className="sr-only">endpoint</span><input name="endpoint" aria-label="endpoint" placeholder="endpoint (optional)" /></label>
+                <label><span className="sr-only">parent device</span><select name="parent_id" aria-label="parent device" defaultValue=""><option value="">no parent (root device)</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name} · {device.connector}</option>)}</select></label>
                 <button className="client-dialog-submit" type="submit"><span>+</span> add client</button>
                 {addClientMessage ? <p className="client-dialog-message" role="status">{addClientMessage}</p> : null}
               </form>
@@ -320,7 +342,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               <p className="section-kicker">raffael / discovery</p><h2 id="discover-title">scan network</h2>
               <form className="client-dialog-form" onSubmit={discover}><label><span className="sr-only">network</span><input name="network" aria-label="network" defaultValue="192.168.1.0/24" required /></label><button className="client-dialog-submit" type="submit">scan</button></form>
               {discoveryMessage ? <p className="client-dialog-message" role="status">{discoveryMessage}</p> : null}
-              {discovered.length ? <div className="cluster-members">{discovered.map((item) => <span key={item.address}>{item.hostname || item.address}{item.open_ports.length ? ` · ${item.open_ports.join(", ")}` : ""}</span>)}</div> : null}
+              {discovered.length ? <div className="cluster-members">{discovered.map((item) => <span key={item.address}>{item.hostname || item.address}{item.open_ports.length ? ` · ${item.open_ports.join(", ")}` : ""}<button type="button" onClick={() => adopt(item)} aria-label={`add ${item.address}`}>+</button></span>)}</div> : null}
             </section>
           </div>
         ) : null}

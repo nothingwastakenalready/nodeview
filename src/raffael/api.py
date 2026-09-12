@@ -68,11 +68,19 @@ class DeviceInput(BaseModel):
     endpoint: str | None = None
     credential_ref: str | None = None
     metadata: dict = Field(default_factory=dict)
+    parent_id: int | None = None
 
 
 class DiscoveryInput(BaseModel):
     network: str = Field(pattern=r"^\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}$")
     workers: int = Field(default=32, ge=1, le=128)
+
+
+class DiscoveryAdoptInput(BaseModel):
+    address: str
+    hostname: str | None = None
+    open_ports: list[int] = Field(default_factory=list)
+    parent_id: int | None = None
 
 
 def result_json(result: CheckResult) -> dict:
@@ -294,6 +302,7 @@ def create_app(
                 device.endpoint,
                 device.credential_ref,
                 device.metadata,
+                device.parent_id,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -309,6 +318,27 @@ def create_app(
         require_csrf(session_token, x_csrf_token or csrf_token)
         try:
             return [item.__dict__ for item in discover_network(request.network, workers=request.workers)]
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/household/discover/adopt", status_code=201)
+    def adopt_discovered_device(
+        device: DiscoveryAdoptInput,
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
+        x_csrf_token: str | None = Header(None),
+    ):
+        _, workspace_id = current_workspace(session_token)
+        require_csrf(session_token, x_csrf_token or csrf_token)
+        if runtime_devices is None:
+            raise HTTPException(status_code=503, detail="device storage unavailable")
+        name = device.hostname or device.address
+        try:
+            return runtime_devices.create(
+                workspace_id, "icmp", name, endpoint=device.address,
+                metadata={"discovered": True, "open_ports": device.open_ports},
+                parent_id=device.parent_id,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

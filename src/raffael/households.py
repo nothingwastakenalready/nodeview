@@ -43,6 +43,7 @@ class DeviceRow(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("devices.id", ondelete="SET NULL"), nullable=True, index=True)
     connector: Mapped[str] = mapped_column(String(32), index=True)
     name: Mapped[str] = mapped_column(String(160))
     endpoint: Mapped[str | None] = mapped_column(String(512), nullable=True)
@@ -76,6 +77,7 @@ class DeviceStore:
         endpoint: str | None = None,
         credential_ref: str | None = None,
         metadata: dict | None = None,
+        parent_id: int | None = None,
     ) -> dict:
         if connector not in CONNECTOR_KEYS:
             raise ValueError("unsupported connector")
@@ -85,6 +87,7 @@ class DeviceStore:
         now = datetime.now(timezone.utc)
         row = DeviceRow(
             workspace_id=workspace_id,
+            parent_id=parent_id,
             connector=connector,
             name=clean_name,
             endpoint=endpoint.strip() if endpoint else None,
@@ -95,6 +98,10 @@ class DeviceStore:
             updated_at=now,
         )
         with Session(self.engine) as session:
+            if parent_id is not None:
+                parent = session.scalar(select(DeviceRow).where(DeviceRow.id == parent_id, DeviceRow.workspace_id == workspace_id))
+                if parent is None:
+                    raise ValueError("parent device not found")
             session.add(row)
             session.commit()
             session.refresh(row)
@@ -109,6 +116,7 @@ def serialize_device(row: DeviceRow) -> dict:
     return {
         "id": row.id,
         "workspace_id": row.workspace_id,
+        "parent_id": row.parent_id,
         "connector": row.connector,
         "name": row.name,
         "endpoint": row.endpoint,

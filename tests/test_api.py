@@ -80,6 +80,14 @@ def test_household_devices_use_workspace_scope_and_connector_catalog(tmp_path):
         assert added.json()["credential_ref"] == "keychain://raffael/pve-living-room"
         assert client.get("/household/devices").json()[0]["name"] == "pve living room"
 
+        child = client.post(
+            "/household/devices",
+            headers={"X-CSRF-Token": csrf},
+            json={"connector": "docker", "name": "raffael services", "parent_id": added.json()["id"]},
+        )
+        assert child.status_code == 201
+        assert child.json()["parent_id"] == added.json()["id"]
+
 
 def test_household_devices_reject_unknown_connector(tmp_path):
     config = tmp_path / "services.yaml"
