@@ -43,8 +43,9 @@ def fetch_unifi_clients() -> list[ImportedClient]:
     base_url = clean_text(os.environ.get("RAFFAEL_UNIFI_URL"))
     username = clean_text(os.environ.get("RAFFAEL_UNIFI_USERNAME"))
     password = clean_text(os.environ.get("RAFFAEL_UNIFI_PASSWORD"))
+    api_key = clean_text(os.environ.get("RAFFAEL_UNIFI_API_KEY"))
     site = clean_text(os.environ.get("RAFFAEL_UNIFI_SITE")) or "default"
-    if not base_url or not username or not password:
+    if not base_url or (not api_key and (not username or not password)):
         raise UniFiImportError("unifi connection is not configured")
 
     verify_tls = os.environ.get("RAFFAEL_UNIFI_VERIFY_TLS", "0") == "1"
@@ -54,20 +55,30 @@ def fetch_unifi_clients() -> list[ImportedClient]:
         handlers.append(HTTPSHandler(context=context))
     opener = build_opener(*handlers)
     try:
-        login_response = request_json(
-            opener,
-            base_url,
-            "/api/auth/login",
-            {"username": username, "password": password},
-        )
-        csrf_token = login_response.get("csrfToken") or login_response.get("csrf_token")
-        clients = get_json(
-            opener,
-            base_url,
-            f"/proxy/network/api/s/{site}/stat/sta",
-            csrf_token=csrf_token,
-        )
+        if api_key:
+            clients = get_json(
+                opener,
+                base_url,
+                f"/proxy/network/api/s/{site}/stat/sta",
+                api_key=api_key,
+            )
+        else:
+            login_response = request_json(
+                opener,
+                base_url,
+                "/api/auth/login",
+                {"username": username, "password": password},
+            )
+            csrf_token = login_response.get("csrfToken") or login_response.get("csrf_token")
+            clients = get_json(
+                opener,
+                base_url,
+                f"/proxy/network/api/s/{site}/stat/sta",
+                csrf_token=csrf_token,
+            )
     except UniFiImportError:
+        if api_key:
+            raise
         request_json(
             opener,
             base_url,
@@ -93,10 +104,12 @@ def request_json(opener, base_url: str, path: str, payload: dict) -> dict:
     return open_json(opener, request)
 
 
-def get_json(opener, base_url: str, path: str, csrf_token: str | None = None) -> dict:
+def get_json(opener, base_url: str, path: str, csrf_token: str | None = None, api_key: str | None = None) -> dict:
     headers = {"Accept": "application/json"}
     if csrf_token:
         headers["X-CSRF-Token"] = csrf_token
+    if api_key:
+        headers["X-API-KEY"] = api_key
     request = Request(
         urljoin(base_url.rstrip("/") + "/", path.lstrip("/")),
         headers=headers,
