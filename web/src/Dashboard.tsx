@@ -177,9 +177,17 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     const params = new URLSearchParams();
     if (parentId) params.set("parent_id", String(parentId));
     const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
+    const config = source === "unifi" ? {
+      url: form.get("url") || undefined,
+      site: form.get("site") || undefined,
+      username: form.get("username") || undefined,
+      password: form.get("password") || undefined,
+      api_key: form.get("api_key") || undefined,
+    } : undefined;
     const response = await fetch(`/integrations/${source}/clients/import${params.size ? `?${params.toString()}` : ""}`, {
       method: "POST",
-      headers: csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {},
+      headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}) },
+      body: JSON.stringify(config || {}),
     });
     if (!response.ok) {
       const detail = await response.json().catch(() => null) as { detail?: string } | null;
@@ -443,6 +451,12 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               <h2 id="source-import-title">import clients</h2>
               <form className="client-dialog-form" onSubmit={importClientsFromSource}>
                 <label><span className="sr-only">source</span><select name="source" aria-label="source" defaultValue="unifi"><option value="unifi">unifi network</option><option value="api">generic api</option><option value="snmp">snmp targets</option></select></label>
+                <label><span className="sr-only">UniFi URL</span><input name="url" aria-label="UniFi URL" placeholder="https://192.168.1.1" /></label>
+                <label><span className="sr-only">UniFi site</span><input name="site" aria-label="UniFi site" placeholder="default" defaultValue="default" /></label>
+                <label><span className="sr-only">UniFi API key</span><input name="api_key" aria-label="UniFi API key" type="password" placeholder="API key (optional)" /></label>
+                <p className="client-dialog-message">API key wird bevorzugt; alternativ Benutzername und Passwort.</p>
+                <label><span className="sr-only">UniFi username</span><input name="username" aria-label="UniFi username" placeholder="username (optional)" /></label>
+                <label><span className="sr-only">UniFi password</span><input name="password" aria-label="UniFi password" type="password" placeholder="password (optional)" /></label>
                 <label><span className="sr-only">parent device</span><select name="parent_id" aria-label="parent device" defaultValue=""><option value="">no parent (root clients)</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name} · {device.connector}</option>)}</select></label>
                 <button className="client-dialog-submit" type="submit"><span>in</span> import clients</button>
                 {sourceImportMessage ? <p className="client-dialog-message" role="status">{sourceImportMessage}</p> : null}

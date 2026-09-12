@@ -39,12 +39,13 @@ def normalize_unifi_client(row: dict) -> ImportedClient | None:
     return ImportedClient(name=name, endpoint=endpoint, mac_address=mac, connector="unifi", metadata=metadata)
 
 
-def fetch_unifi_clients() -> list[ImportedClient]:
-    base_url = clean_text(os.environ.get("RAFFAEL_UNIFI_URL"))
-    username = clean_text(os.environ.get("RAFFAEL_UNIFI_USERNAME"))
-    password = clean_text(os.environ.get("RAFFAEL_UNIFI_PASSWORD"))
-    api_key = clean_text(os.environ.get("RAFFAEL_UNIFI_API_KEY"))
-    site = clean_text(os.environ.get("RAFFAEL_UNIFI_SITE")) or "default"
+def fetch_unifi_clients(config: dict | None = None) -> list[ImportedClient]:
+    config = config or {}
+    base_url = clean_text(config.get("url")) or clean_text(os.environ.get("RAFFAEL_UNIFI_URL"))
+    username = clean_text(config.get("username")) or clean_text(os.environ.get("RAFFAEL_UNIFI_USERNAME"))
+    password = clean_text(config.get("password")) or clean_text(os.environ.get("RAFFAEL_UNIFI_PASSWORD"))
+    api_key = clean_text(config.get("api_key")) or clean_text(os.environ.get("RAFFAEL_UNIFI_API_KEY"))
+    site = clean_text(config.get("site")) or clean_text(os.environ.get("RAFFAEL_UNIFI_SITE")) or "default"
     if not base_url or (not api_key and (not username or not password)):
         raise UniFiImportError("unifi connection is not configured")
 

@@ -83,6 +83,14 @@ class ClientInput(BaseModel):
     metadata: dict = Field(default_factory=dict)
 
 
+class IntegrationImportInput(BaseModel):
+    url: str | None = None
+    site: str | None = None
+    username: str | None = None
+    password: str | None = None
+    api_key: str | None = None
+
+
 class DiscoveryInput(BaseModel):
     network: str = Field(pattern=r"^\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}$")
     workers: int = Field(default=32, ge=1, le=128)
@@ -362,6 +370,7 @@ def create_app(
     @app.post("/integrations/{source}/clients/import")
     def import_clients_from_source(
         source: str,
+        config: IntegrationImportInput | None = None,
         parent_id: int | None = None,
         session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
         csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
@@ -375,7 +384,10 @@ def create_app(
         if source_loader is None:
             raise HTTPException(status_code=400, detail=f"{source} client import is not implemented yet")
         try:
-            imported_clients = source_loader()
+            if source == "unifi" and config is not None:
+                imported_clients = fetch_unifi_clients(config.model_dump(exclude_none=True))
+            else:
+                imported_clients = source_loader()
             created = 0
             updated = 0
             devices = []
