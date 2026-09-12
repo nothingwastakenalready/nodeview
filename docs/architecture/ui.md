@@ -140,6 +140,25 @@ The overview should migrate from service tiles to node tiles once that backend m
 - motion stays subtle and respects reduced-motion preferences
 - accents can be sharper and more ownable than today, but must support state clarity
 
+## current visual direction (2026-09-12)
+
+The first visual pass now follows a dark operations-console direction inspired by
+modular technical dashboards and compact diagnostic widgets. This is a Raffael
+direction, not a copy of any reference product.
+
+- near-black canvas with a restrained dotted field
+- modular widgets with quiet borders and compact radii
+- warm white typography with orange for attention and red for critical state
+- technical monospace typography for numbers, labels and system copy
+- small dot meters and signal marks only where they represent a real value or
+  a clearly labelled visual summary
+- login uses the same dark system, with a grid field, an orange accent and a
+  focused split layout
+
+The overview keeps the existing service state and latency logic. New widgets
+derive only from live state: healthy percentage, warning/critical count and the
+selected monitor latency. No illustrative metrics are presented as real data.
+
 ## copy
 
 Copy stays short and dry.

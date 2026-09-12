@@ -21,6 +21,80 @@ def test_health_does_not_run_checks(tmp_path):
     assert response.json() == {"status": "ok"}
 
 
+def test_auth_lifecycle_uses_server_side_session_and_csrf(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    with TestClient(create_app(config_path=config, database_url=f"sqlite:///{tmp_path / 'auth.db'}")) as client:
+        registered = client.post("/auth/register", json={"email": " User@example.com ", "password": "a sufficiently long password"})
+        assert registered.status_code == 201
+        assert registered.json()["email"] == "user@example.com"
+        assert registered.json()["workspaces"][0]["role"] == "owner"
+        assert "HttpOnly" in registered.headers["set-cookie"]
+        assert client.get("/auth/me").json()["workspaces"][0]["name"] == "default"
+
+        without_csrf = client.post("/auth/logout")
+        assert without_csrf.status_code == 403
+        csrf = client.cookies.get("raffael_csrf")
+        logged_out = client.post("/auth/logout", headers={"X-CSRF-Token": csrf})
+        assert logged_out.status_code == 204
+        assert client.get("/auth/me").status_code == 401
+
+
+def test_auth_rejects_duplicate_registration(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    with TestClient(create_app(config_path=config, database_url=f"sqlite:///{tmp_path / 'auth.db'}")) as client:
+        payload = {"email": "user@example.com", "password": "a sufficiently long password"}
+        assert client.post("/auth/register", json=payload).status_code == 201
+        assert client.post("/auth/register", json=payload).status_code == 400
+
+
+def test_household_devices_use_workspace_scope_and_connector_catalog(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    with TestClient(create_app(config_path=config, database_url=f"sqlite:///{tmp_path / 'auth.db'}")) as client:
+        assert client.get("/integrations/catalog").status_code == 401
+        registered = client.post(
+            "/auth/register",
+            json={"email": "owner@example.com", "password": "a sufficiently long password"},
+        )
+        assert registered.status_code == 201
+        catalog = client.get("/integrations/catalog")
+        assert catalog.status_code == 200
+        assert {item["key"] for item in catalog.json()} >= {"unifi", "hue", "proxmox", "windows-agent", "macos-agent"}
+
+        csrf = client.cookies.get("raffael_csrf")
+        added = client.post(
+            "/household/devices",
+            headers={"X-CSRF-Token": csrf},
+            json={
+                "connector": "proxmox",
+                "name": "pve living room",
+                "endpoint": "https://pve.local:8006",
+                "credential_ref": "keychain://raffael/pve-living-room",
+                "metadata": {"node": "pve"},
+            },
+        )
+        assert added.status_code == 201
+        assert added.json()["status"] == "pending"
+        assert added.json()["credential_ref"] == "keychain://raffael/pve-living-room"
+        assert client.get("/household/devices").json()[0]["name"] == "pve living room"
+
+
+def test_household_devices_reject_unknown_connector(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    with TestClient(create_app(config_path=config, database_url=f"sqlite:///{tmp_path / 'auth.db'}")) as client:
+        client.post("/auth/register", json={"email": "owner@example.com", "password": "a sufficiently long password"})
+        csrf = client.cookies.get("raffael_csrf")
+        response = client.post(
+            "/household/devices",
+            headers={"X-CSRF-Token": csrf},
+            json={"connector": "ssh-root", "name": "unsafe"},
+        )
+        assert response.status_code == 400
+
+
 def test_services_returns_shared_check_results(tmp_path):
     config = tmp_path / "services.yaml"
     config.write_text("services:\n  - name: ssh\n    type: tcp\n    host: 127.0.0.1\n    port: 22\n")

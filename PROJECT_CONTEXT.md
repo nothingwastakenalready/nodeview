@@ -197,6 +197,10 @@ First browser UI shell:
 
 Current operational state remains intentionally in-memory and resets to pending after restart. Scheduled check measurements now persist in SQLite through a SQLAlchemy boundary, with an initial Alembic migration and bounded UTC time-range API. There is no uptime calculation, retention job, state-change event table, alerting, authentication, final node/workspace model or dependency topology yet.
 
+The browser UI now has a dark modular operations-console direction. It uses live-derived overview widgets for healthy percentage, attention count and selected latency, plus the existing service status overview and detail panel. A login page exists as a visual route at `#/login`; it does not claim successful authentication until the backend auth slice is connected.
+
+The first backend auth slice now provides local registration, Argon2id password hashing, server-side sessions, CSRF-protected logout, an owner membership in a default workspace, and authentication gates on service/state/history reads when database-backed auth is enabled. YAML monitor configuration is still shared self-hosted data rather than independently workspace-owned; a later model must add explicit workspace ownership before recommending internet-facing multi-tenant deployment.
+
 The remaining v0.4 work is state-change events, retention and uptime calculation. Keep the slice narrow; Raffael is not a general-purpose TSDB.
 
 ## local inspection

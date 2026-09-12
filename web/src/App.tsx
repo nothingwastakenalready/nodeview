@@ -1,15 +1,30 @@
 import { useEffect, useState } from "react";
 
 import { Dashboard } from "./Dashboard";
+import { LoginPage } from "./LoginPage";
 import type { ServiceState } from "./model";
 
 const refreshMs = 5000;
 
 export function App() {
+  const [route, setRoute] = useState(window.location.hash || "#/dashboard");
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [states, setStates] = useState<ServiceState[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/auth/me", { headers: { Accept: "application/json" } })
+      .then((response) => setAuthenticated(response.ok))
+      .catch(() => setAuthenticated(false));
+  }, []);
+
+  useEffect(() => {
+    const onHashChange = () => setRoute(window.location.hash || "#/dashboard");
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -42,6 +57,12 @@ export function App() {
       window.clearInterval(timer);
     };
   }, []);
+
+  if (route === "#/login" || route === "#/register" || authenticated === false) {
+    return <LoginPage register={route === "#/register"} onAuthenticated={() => { setAuthenticated(true); window.location.hash = "#/dashboard"; }} />;
+  }
+
+  if (authenticated === null) return <div className="boot-state">checking session.</div>;
 
   if (loading) {
     return <div className="boot-state">raffael is looking around.</div>;

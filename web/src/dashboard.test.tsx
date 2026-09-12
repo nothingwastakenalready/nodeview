@@ -33,7 +33,7 @@ describe("Dashboard", () => {
       <Dashboard states={states} selectedName="dns" onSelect={() => undefined} />
     );
 
-    expect(html).toContain("infrastructure");
+    expect(html).toContain("system overview");
     expect(html).toContain("dns");
     expect(html).toContain("12 ms");
     expect(html).toContain("healthy");
