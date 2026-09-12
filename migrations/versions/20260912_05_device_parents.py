@@ -13,14 +13,13 @@ def upgrade() -> None:
     # A failed SQLite batch migration can leave Alembic's temporary table
     # behind. Remove it before retrying so the migration is self-healing.
     op.execute("DROP TABLE IF EXISTS _alembic_tmp_devices")
-    with op.batch_alter_table("devices", recreate="always") as batch:
-        batch.add_column(sa.Column("parent_id", sa.Integer(), nullable=True))
-        batch.create_index("ix_devices_parent_id", ["parent_id"])
-        batch.create_foreign_key("fk_devices_parent_id", "devices", ["parent_id"], ["id"], ondelete="SET NULL")
+    # SQLite cannot reliably recreate a table with a self-referencing FK
+    # while a previous failed batch is present. A nullable column plus index
+    # provides the same application behavior without the fragile rebuild.
+    op.add_column("devices", sa.Column("parent_id", sa.Integer(), nullable=True))
+    op.create_index("ix_devices_parent_id", "devices", ["parent_id"])
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("devices", recreate="always") as batch:
-        batch.drop_constraint("fk_devices_parent_id", type_="foreignkey")
-        batch.drop_index("ix_devices_parent_id")
-        batch.drop_column("parent_id")
+    op.drop_index("ix_devices_parent_id", table_name="devices")
+    op.drop_column("devices", "parent_id")
