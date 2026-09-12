@@ -47,6 +47,33 @@ function constellationPosition(index: number, total: number): { x: number; y: nu
   };
 }
 
+type Point = { x: number; y: number };
+const CONSTELLATION_TEMPLATES: Array<{ name: string; points: Point[]; minimum: number }> = [
+  { name: "Großer Wagen", minimum: 7, points: [{ x: 18, y: 52 }, { x: 31, y: 42 }, { x: 44, y: 49 }, { x: 57, y: 39 }, { x: 72, y: 33 }, { x: 82, y: 52 }, { x: 67, y: 62 }] },
+  { name: "Cassiopeia", minimum: 5, points: [{ x: 15, y: 48 }, { x: 30, y: 32 }, { x: 45, y: 55 }, { x: 60, y: 32 }, { x: 76, y: 48 }] },
+  { name: "Orion", minimum: 8, points: [{ x: 25, y: 25 }, { x: 75, y: 25 }, { x: 20, y: 68 }, { x: 80, y: 68 }, { x: 40, y: 42 }, { x: 50, y: 51 }, { x: 60, y: 42 }, { x: 50, y: 78 }] },
+];
+
+function topologyTemplate(nodes: HouseholdDevice[]): { name: string; positions: Map<string, Point> } {
+  const degrees = new Map(nodes.map((node) => [node.id, 0]));
+  nodes.forEach((node) => { if (node.parent_id !== null) degrees.set(node.parent_id, (degrees.get(node.parent_id) ?? 0) + 1); });
+  const root = nodes.find((node) => node.parent_id === null) ?? nodes[0];
+  const hubDegree = root ? degrees.get(root.id) ?? 0 : 0;
+  const template = hubDegree >= 4
+    ? CONSTELLATION_TEMPLATES[0]
+    : nodes.length >= 8 && hubDegree <= 2
+      ? CONSTELLATION_TEMPLATES[2]
+      : nodes.length >= 5 && hubDegree <= 2
+        ? CONSTELLATION_TEMPLATES[1]
+        : { name: "Raffael-Muster", points: [] };
+  const ordered: HouseholdDevice[] = [];
+  if (root) ordered.push(root);
+  for (const node of nodes) if (node !== root && !ordered.includes(node)) ordered.push(node);
+  const positions = new Map<string, Point>();
+  template.points.forEach((point, index) => { if (ordered[index]) positions.set(ordered[index].name, point); });
+  return { name: template.name, positions };
+}
+
 export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   const summary = summarizeStates(states);
   const selected = states.find((state) => state.name === selectedName) ?? states[0] ?? null;
@@ -102,7 +129,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   }
 
   function positionFor(name: string, index: number, total = states.length): { x: number; y: number } {
-    return positions[name] ?? constellationPosition(index, total);
+    return positions[name] ?? constellation.positions.get(name) ?? constellationPosition(index, total);
   }
 
   function moveStar(event: ReactPointerEvent<HTMLButtonElement>, name: string) {
@@ -253,6 +280,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   const constellationNodes: HouseholdDevice[] = devices.length
     ? devices
     : states.map((state, index) => ({ id: -(index + 1), name: state.name, connector: "", endpoint: null, parent_id: null, metadata: {}, status: "" } as HouseholdDevice));
+  const constellation = topologyTemplate(constellationNodes);
 
   return (
     <div className="shell">
@@ -325,7 +353,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               </div>
               <div className="panel-heading-actions"><span className="panel-meta">{states.length} configured</span><button className="add-client-button" type="button" aria-label="add client" onClick={() => setShowAddClient(true)}>+</button></div>
             </div>
-            <p className="topology-note">connections are drawn from known parent and dependency relationships.</p>
+                <p className="topology-note">{constellation.name}: detected from known topology relationships.</p>
 
             {states.length === 0 ? (
               <div className="empty-state">nothing configured yet.</div>
