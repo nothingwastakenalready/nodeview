@@ -16,8 +16,13 @@ def upgrade() -> None:
     # SQLite cannot reliably recreate a table with a self-referencing FK
     # while a previous failed batch is present. A nullable column plus index
     # provides the same application behavior without the fragile rebuild.
-    op.add_column("devices", sa.Column("parent_id", sa.Integer(), nullable=True))
-    op.create_index("ix_devices_parent_id", "devices", ["parent_id"])
+    inspector = sa.inspect(op.get_bind())
+    columns = {column["name"] for column in inspector.get_columns("devices")}
+    if "parent_id" not in columns:
+        op.add_column("devices", sa.Column("parent_id", sa.Integer(), nullable=True))
+    indexes = {index["name"] for index in inspector.get_indexes("devices")}
+    if "ix_devices_parent_id" not in indexes:
+        op.create_index("ix_devices_parent_id", "devices", ["parent_id"])
 
 
 def downgrade() -> None:
