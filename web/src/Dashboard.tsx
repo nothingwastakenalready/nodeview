@@ -10,6 +10,16 @@ interface DashboardProps {
   onSelect: (name: string) => void;
 }
 
+interface HouseholdDevice {
+  id: number;
+  name: string;
+  connector: string;
+  endpoint: string | null;
+  parent_id: number | null;
+  metadata: Record<string, unknown>;
+  status: string;
+}
+
 const summaryOrder: Array<Exclude<StatusTone, "unknown"> | "unknown"> = [
   "healthy",
   "warning",
@@ -56,7 +66,8 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
   const [discovered, setDiscovered] = useState<Array<{ address: string; hostname: string | null; open_ports: number[] }>>([]);
   const [addClientMessage, setAddClientMessage] = useState<string | null>(null);
-  const [devices, setDevices] = useState<Array<{ id: number; name: string; connector: string; parent_id: number | null }>>([]);
+  const [devices, setDevices] = useState<HouseholdDevice[]>([]);
+  const [clients, setClients] = useState<HouseholdDevice[]>([]);
   const draggedRef = useRef(false);
 
   useEffect(() => {
@@ -70,11 +81,22 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   }, [hasUnsavedLayout]);
 
   useEffect(() => {
-    fetch("/household/devices")
-      .then((response) => response.ok ? response.json() : [])
-      .then((items: Array<{ id: number; name: string; connector: string; parent_id: number | null }>) => setDevices(items))
-      .catch(() => setDevices([]));
+    void refreshDevices();
   }, [showAddClient]);
+
+  async function refreshDevices() {
+    try {
+      const [deviceResponse, clientResponse] = await Promise.all([
+        fetch("/household/devices"),
+        fetch("/household/clients"),
+      ]);
+      setDevices(deviceResponse.ok ? await deviceResponse.json() as HouseholdDevice[] : []);
+      setClients(clientResponse.ok ? await clientResponse.json() as HouseholdDevice[] : []);
+    } catch {
+      setDevices([]);
+      setClients([]);
+    }
+  }
 
   function positionFor(name: string, index: number): { x: number; y: number } {
     return positions[name] ?? constellationPosition(index, states.length);
@@ -100,13 +122,14 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
-    const response = await fetch("/household/devices", {
+    const response = await fetch("/household/clients", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}) },
       body: JSON.stringify({
-        connector: form.get("connector"),
+        connector: form.get("connector") || "icmp",
         name: form.get("name"),
         endpoint: form.get("endpoint") || null,
+        mac_address: form.get("mac_address") || null,
         parent_id: form.get("parent_id") ? Number(form.get("parent_id")) : null,
       }),
     });
@@ -115,8 +138,9 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
       return;
     }
     setAddClientMessage("client added");
-    const created = await response.json() as { id: number; name: string; connector: string; parent_id: number | null };
+    const created = await response.json() as HouseholdDevice;
     setDevices((current) => [...current, created]);
+    setClients((current) => [...current, created]);
     event.currentTarget.reset();
   }
 
@@ -135,10 +159,16 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
     const response = await fetch("/household/discover/adopt", { method: "POST", headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}) }, body: JSON.stringify(item) });
     if (!response.ok) { setDiscoveryMessage("could not add device"); return; }
-    const created = await response.json() as { id: number; name: string; connector: string; parent_id: number | null };
+    const created = await response.json() as HouseholdDevice;
     setDevices((current) => [...current, created]);
+    setClients((current) => [...current, created]);
     setDiscovered((current) => current.filter((candidate) => candidate.address !== item.address));
     setDiscoveryMessage("device added");
+  }
+
+  function parentName(parentId: number | null): string {
+    if (parentId === null) return "root";
+    return devices.find((device) => device.id === parentId)?.name ?? `#${parentId}`;
   }
 
   return (
@@ -316,6 +346,38 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
           </div>
         </section>
 
+        <section className="clients-section" aria-labelledby="clients-title">
+          <div className="panel-heading">
+            <div><p className="section-kicker">network inventory</p><h2 id="clients-title">clients</h2></div>
+            <div className="panel-heading-actions">
+              <span className="panel-meta">{clients.length} saved</span>
+              <button className="add-client-button" type="button" aria-label="add client" onClick={() => setShowAddClient(true)}>+</button>
+            </div>
+          </div>
+          {clients.length === 0 ? (
+            <div className="clients-empty">no clients saved yet.</div>
+          ) : (
+            <div className="clients-table" role="table" aria-label="Saved clients">
+              <div className="clients-row clients-row-head" role="row">
+                <span role="columnheader">name</span>
+                <span role="columnheader">endpoint</span>
+                <span role="columnheader">parent</span>
+                <span role="columnheader">connector</span>
+                <span role="columnheader">mac</span>
+              </div>
+              {clients.map((client) => (
+                <div className="clients-row" role="row" key={client.id}>
+                  <strong role="cell">{client.name}</strong>
+                  <span role="cell">{client.endpoint || "not set"}</span>
+                  <span role="cell">{parentName(client.parent_id)}</span>
+                  <span role="cell">{client.connector}</span>
+                  <span role="cell">{String(client.metadata.mac_address || "not set")}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         <footer className="workspace-footnote">raffael · local infrastructure · v0.6</footer>
 
         {showAddClient ? (
@@ -326,8 +388,9 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               <h2 id="add-client-title">new client</h2>
               <form className="client-dialog-form" onSubmit={addClient}>
                 <label><span className="sr-only">name</span><input name="name" aria-label="name" placeholder="name" autoFocus required /></label>
-                <label><span className="sr-only">connector</span><select name="connector" aria-label="connector" defaultValue="generic"><option value="generic">generic service</option><option value="icmp">ping / network</option><option value="snmp">SNMP</option><option value="unifi">unifi</option><option value="hue">philips hue</option><option value="proxmox">proxmox</option><option value="docker">docker</option><option value="ssh">SSH Linux</option><option value="windows-agent">windows</option><option value="macos-agent">macos</option></select></label>
-                <label><span className="sr-only">endpoint</span><input name="endpoint" aria-label="endpoint" placeholder="endpoint (optional)" /></label>
+                <label><span className="sr-only">endpoint</span><input name="endpoint" aria-label="ip or hostname" placeholder="ip or hostname" /></label>
+                <label><span className="sr-only">mac address</span><input name="mac_address" aria-label="mac address" placeholder="mac address (optional)" /></label>
+                <label><span className="sr-only">connector</span><select name="connector" aria-label="connector" defaultValue="icmp"><option value="icmp">ping / network</option><option value="generic">generic service</option><option value="snmp">SNMP</option><option value="unifi">unifi</option><option value="hue">philips hue</option><option value="proxmox">proxmox</option><option value="docker">docker</option><option value="ssh">SSH Linux</option><option value="windows-agent">windows</option><option value="macos-agent">macos</option></select></label>
                 <label><span className="sr-only">parent device</span><select name="parent_id" aria-label="parent device" defaultValue=""><option value="">no parent (root device)</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name} · {device.connector}</option>)}</select></label>
                 <button className="client-dialog-submit" type="submit"><span>+</span> add client</button>
                 {addClientMessage ? <p className="client-dialog-message" role="status">{addClientMessage}</p> : null}

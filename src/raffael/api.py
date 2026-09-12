@@ -71,6 +71,15 @@ class DeviceInput(BaseModel):
     parent_id: int | None = None
 
 
+class ClientInput(BaseModel):
+    name: str
+    endpoint: str | None = None
+    mac_address: str | None = None
+    connector: str = "icmp"
+    parent_id: int | None = None
+    metadata: dict = Field(default_factory=dict)
+
+
 class DiscoveryInput(BaseModel):
     network: str = Field(pattern=r"^\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}$")
     workers: int = Field(default=32, ge=1, le=128)
@@ -307,6 +316,37 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.get("/household/clients")
+    def household_clients(session_token: str | None = Cookie(None, alias=SESSION_COOKIE)):
+        _, workspace_id = current_workspace(session_token)
+        if runtime_devices is None:
+            raise HTTPException(status_code=503, detail="device storage unavailable")
+        return runtime_devices.list_clients(workspace_id)
+
+    @app.post("/household/clients", status_code=201)
+    def add_household_client(
+        client: ClientInput,
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
+        x_csrf_token: str | None = Header(None),
+    ):
+        _, workspace_id = current_workspace(session_token)
+        require_csrf(session_token, x_csrf_token or csrf_token)
+        if runtime_devices is None:
+            raise HTTPException(status_code=503, detail="device storage unavailable")
+        try:
+            return runtime_devices.create_client(
+                workspace_id,
+                client.name,
+                endpoint=client.endpoint,
+                mac_address=client.mac_address,
+                connector=client.connector,
+                parent_id=client.parent_id,
+                metadata=client.metadata,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/household/discover")
     def discover_devices(
         request: DiscoveryInput,
@@ -336,7 +376,7 @@ def create_app(
         try:
             return runtime_devices.create(
                 workspace_id, "icmp", name, endpoint=device.address,
-                metadata={"discovered": True, "open_ports": device.open_ports},
+                metadata={"role": "client", "discovered": True, "open_ports": device.open_ports},
                 parent_id=device.parent_id,
             )
         except ValueError as exc:

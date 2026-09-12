@@ -103,6 +103,65 @@ def test_household_devices_reject_unknown_connector(tmp_path):
         assert response.status_code == 400
 
 
+def test_household_clients_are_role_marked_devices(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    with TestClient(create_app(config_path=config, database_url=f"sqlite:///{tmp_path / 'auth.db'}")) as client:
+        registered = client.post(
+            "/auth/register",
+            json={"email": "owner@example.com", "password": "a sufficiently long password"},
+        )
+        assert registered.status_code == 201
+        csrf = client.cookies.get("raffael_csrf")
+
+        parent = client.post(
+            "/household/devices",
+            headers={"X-CSRF-Token": csrf},
+            json={"connector": "unifi", "name": "office ap"},
+        )
+        assert parent.status_code == 201
+
+        created = client.post(
+            "/household/clients",
+            headers={"X-CSRF-Token": csrf},
+            json={
+                "name": "macbook",
+                "endpoint": "192.168.1.52",
+                "mac_address": "AA-BB-CC-DD-EE-FF",
+                "connector": "icmp",
+                "parent_id": parent.json()["id"],
+            },
+        )
+
+        assert created.status_code == 201
+        body = created.json()
+        assert body["connector"] == "icmp"
+        assert body["endpoint"] == "192.168.1.52"
+        assert body["parent_id"] == parent.json()["id"]
+        assert body["metadata"]["role"] == "client"
+        assert body["metadata"]["mac_address"] == "aa:bb:cc:dd:ee:ff"
+
+        clients = client.get("/household/clients")
+        assert clients.status_code == 200
+        assert [item["name"] for item in clients.json()] == ["macbook"]
+
+
+def test_household_clients_reject_invalid_mac_address(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    with TestClient(create_app(config_path=config, database_url=f"sqlite:///{tmp_path / 'auth.db'}")) as client:
+        client.post("/auth/register", json={"email": "owner@example.com", "password": "a sufficiently long password"})
+        csrf = client.cookies.get("raffael_csrf")
+
+        response = client.post(
+            "/household/clients",
+            headers={"X-CSRF-Token": csrf},
+            json={"name": "bad client", "mac_address": "not-a-mac"},
+        )
+
+        assert response.status_code == 400
+
+
 def test_services_returns_shared_check_results(tmp_path):
     config = tmp_path / "services.yaml"
     config.write_text("services:\n  - name: ssh\n    type: tcp\n    host: 127.0.0.1\n    port: 22\n")

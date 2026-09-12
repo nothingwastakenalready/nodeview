@@ -4,7 +4,10 @@ Secrets are deliberately not stored here. Connector implementations receive a
 credential reference and resolve it through an OS/environment secret store.
 """
 
+from __future__ import annotations
+
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -36,6 +39,8 @@ CONNECTORS = (
     ConnectorSpec("generic", "Generic service", "http / tcp", "manual endpoint", "custom health check"),
 )
 CONNECTOR_KEYS = {item.key for item in CONNECTORS}
+DEVICE_ROLES = {"infrastructure", "service", "client", "iot"}
+MAC_ADDRESS_RE = re.compile(r"^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$")
 
 
 class DeviceRow(Base):
@@ -69,6 +74,13 @@ class DeviceStore:
             ).all()
             return [serialize_device(row) for row in rows]
 
+    def list_clients(self, workspace_id: int) -> list[dict]:
+        return [
+            item
+            for item in self.list(workspace_id)
+            if item["metadata"].get("role") == "client"
+        ]
+
     def create(
         self,
         workspace_id: int,
@@ -84,6 +96,7 @@ class DeviceStore:
         clean_name = name.strip()
         if not clean_name or len(clean_name) > 160:
             raise ValueError("device name required")
+        clean_metadata = normalize_metadata(metadata)
         now = datetime.now(timezone.utc)
         row = DeviceRow(
             workspace_id=workspace_id,
@@ -92,7 +105,7 @@ class DeviceStore:
             name=clean_name,
             endpoint=endpoint.strip() if endpoint else None,
             credential_ref=credential_ref.strip() if credential_ref else None,
-            metadata_json=json.dumps(metadata or {}, separators=(",", ":")),
+            metadata_json=json.dumps(clean_metadata, separators=(",", ":")),
             status="pending",
             created_at=now,
             updated_at=now,
@@ -106,6 +119,32 @@ class DeviceStore:
             session.commit()
             session.refresh(row)
             return serialize_device(row)
+
+    def create_client(
+        self,
+        workspace_id: int,
+        name: str,
+        endpoint: str | None = None,
+        mac_address: str | None = None,
+        connector: str = "icmp",
+        parent_id: int | None = None,
+        metadata: dict | None = None,
+    ) -> dict:
+        clean_metadata = normalize_metadata(metadata)
+        clean_metadata["role"] = "client"
+        if mac_address:
+            clean_mac = mac_address.strip().lower().replace("-", ":")
+            if not MAC_ADDRESS_RE.fullmatch(clean_mac):
+                raise ValueError("client mac address is invalid")
+            clean_metadata["mac_address"] = clean_mac
+        return self.create(
+            workspace_id,
+            connector,
+            name,
+            endpoint=endpoint,
+            metadata=clean_metadata,
+            parent_id=parent_id,
+        )
 
 
 def serialize_device(row: DeviceRow) -> dict:
@@ -126,3 +165,14 @@ def serialize_device(row: DeviceRow) -> dict:
         "created_at": row.created_at.isoformat(),
         "updated_at": row.updated_at.isoformat(),
     }
+
+
+def normalize_metadata(metadata: dict | None) -> dict:
+    clean_metadata = dict(metadata or {})
+    role = clean_metadata.get("role")
+    if role is not None:
+        clean_role = str(role).strip().lower()
+        if clean_role not in DEVICE_ROLES:
+            raise ValueError("unsupported device role")
+        clean_metadata["role"] = clean_role
+    return clean_metadata
