@@ -27,7 +27,7 @@ export function LoginPage({ onAuthenticated, register = false }: LoginPageProps)
     event.preventDefault(); setError(null); setBusy(true);
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/auth/register", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ email: form.get("email"), password: form.get("password"), workspace_name: form.get("workspace_name") || "default" }) });
+      const response = await fetch("/auth/register", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ email: form.get("email"), password: form.get("password"), workspace_name: form.get("workspace_name") || "default", newsletter_opt_in: form.get("newsletter_opt_in") === "on" }) });
       if (!response.ok) throw new Error("Account could not be created.");
       onAuthenticated();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Account could not be created."); }
@@ -62,6 +62,7 @@ export function LoginPage({ onAuthenticated, register = false }: LoginPageProps)
           <label><span className="sr-only">email</span><input type="email" name="email" autoComplete="email" placeholder="email" required /></label>
           <label><span className="sr-only">password</span><input type="password" name="password" autoComplete="new-password" placeholder="password" minLength={12} required /></label>
           <label><span className="sr-only">workspace</span><input name="workspace_name" placeholder="workspace" maxLength={120} /></label>
+          <label className="newsletter-opt-in"><input type="checkbox" name="newsletter_opt_in" /> <span>send me the raffael newsletter</span></label>
           <button className="login-submit" type="submit" disabled={busy}>{busy ? "Creating…" : "Create account"}</button>
         </form>
         {error ? <p className="login-note" role="alert">{error}</p> : null}

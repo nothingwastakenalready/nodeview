@@ -46,3 +46,14 @@ def confirmation_email(*, recipient: str, confirmation_url: str, logo_url: str) 
   </table>
 </body></html>"""
     return EmailMessage(subject=subject, text=text, html=html)
+
+
+def newsletter_confirmation_email(*, recipient: str, confirmation_url: str, logo_url: str) -> EmailMessage:
+    safe_recipient = escape(recipient)
+    safe_url = escape(confirmation_url, quote=True)
+    safe_logo = escape(logo_url, quote=True)
+    return EmailMessage(
+        subject="confirm your raffael newsletter subscription",
+        text=f"hello {recipient},\n\nconfirm your newsletter subscription:\n{confirmation_url}\n",
+        html=f"""<!doctype html><html lang=\"en\"><body style=\"margin:0;background:#020406;color:#eef2f3;font-family:Arial,sans-serif;\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#020406;\"><tr><td align=\"center\" style=\"padding:56px 20px;\"><img src=\"{safe_logo}\" alt=\"raffael\" width=\"88\" style=\"display:block;margin-bottom:48px;\"><p style=\"color:#8fa1ad;font-size:11px;letter-spacing:2px;\">raffael / newsletter</p><h1 style=\"font-size:32px;font-weight:400;\">confirm subscription</h1><p style=\"color:#c7d0d5;font-size:15px;\">hello {safe_recipient}, confirm your newsletter subscription.</p><a href=\"{safe_url}\" style=\"display:inline-block;padding:14px 22px;background:#eef2f3;color:#020406;text-decoration:none;font-size:12px;\">confirm</a></td></tr></table></body></html>""",
+    )

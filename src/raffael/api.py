@@ -15,7 +15,9 @@ from .config import Service, load_services
 from .engine import MonitoringEngine
 from .history import HistoryStore, SqlAlchemyHistoryStore
 from .auth import AuthStore, CSRF_COOKIE, SESSION_COOKIE
+from .email_templates import confirmation_email, newsletter_confirmation_email
 from .households import DeviceStore, connector_catalog
+from .mailer import SmtpMailer
 
 Checker = Callable[[Service], CheckResult]
 
@@ -47,6 +49,7 @@ class AccountInput(BaseModel):
     email: str
     password: str
     workspace_name: str = "default"
+    newsletter_opt_in: bool = False
 
 
 class DeviceInput(BaseModel):
@@ -72,12 +75,14 @@ def create_app(
     ui_path: str | Path | None = None,
     history: HistoryStore | None = None,
     database_url: str | None = None,
+    mailer: SmtpMailer | None = None,
 ) -> FastAPI:
     path = Path(config_path or os.environ.get("RAFFAEL_CONFIG", "/config/services.yaml"))
     runtime_engine = engine
     runtime_history = history
     runtime_auth: AuthStore | None = None
     runtime_devices: DeviceStore | None = None
+    runtime_mailer = mailer or SmtpMailer()
     ui_root = Path(ui_path or os.environ.get("RAFFAEL_UI", "/app/web/dist"))
 
     @asynccontextmanager
@@ -151,10 +156,32 @@ def create_app(
             user = runtime_auth.register(account.email, account.password, account.workspace_name)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        public_url = os.environ.get("RAFFAEL_PUBLIC_URL", "http://127.0.0.1:8080").rstrip("/")
+        verification_token = runtime_auth.issue_token(user.id, "email_verification")
+        verification_message = confirmation_email(recipient=user.email, confirmation_url=f"{public_url}/auth/confirm?token={verification_token}", logo_url=f"{public_url}/assets/raffael-logo-white.svg")
+        if runtime_mailer.enabled:
+            runtime_mailer.send(user.email, verification_message)
+        if account.newsletter_opt_in:
+            newsletter_token = runtime_auth.start_newsletter(user.id, "i want to receive the raffael newsletter")
+            newsletter_message = newsletter_confirmation_email(recipient=user.email, confirmation_url=f"{public_url}/auth/newsletter/confirm?token={newsletter_token}", logo_url=f"{public_url}/assets/raffael-logo-white.svg")
+            if runtime_mailer.enabled:
+                runtime_mailer.send(user.email, newsletter_message)
         token, csrf = runtime_auth.create_session(user.id)
         response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=os.environ.get("RAFFAEL_SECURE_COOKIES", "0") == "1", samesite="lax", max_age=7 * 24 * 3600)
         response.set_cookie(CSRF_COOKIE, csrf, httponly=False, secure=os.environ.get("RAFFAEL_SECURE_COOKIES", "0") == "1", samesite="lax", max_age=7 * 24 * 3600)
-        return {"id": user.id, "email": user.email, "workspaces": runtime_auth.memberships(user.id)}
+        return {"id": user.id, "email": user.email, "email_verified": False, "workspaces": runtime_auth.memberships(user.id)}
+
+    @app.get("/auth/confirm")
+    def confirm_email(token: str):
+        if runtime_auth is None or not runtime_auth.confirm_email(token):
+            raise HTTPException(status_code=400, detail="invalid or expired confirmation token")
+        return {"status": "confirmed"}
+
+    @app.get("/auth/newsletter/confirm")
+    def confirm_newsletter(token: str):
+        if runtime_auth is None or not runtime_auth.confirm_newsletter(token):
+            raise HTTPException(status_code=400, detail="invalid or expired newsletter token")
+        return {"status": "subscribed"}
 
     @app.post("/auth/login")
     def login(account: AccountInput, response: Response):

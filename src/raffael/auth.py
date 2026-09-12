@@ -24,6 +24,7 @@ class UserRow(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(512))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class WorkspaceRow(Base):
@@ -53,6 +54,31 @@ class SessionRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AuthTokenRow(Base):
+    __tablename__ = "auth_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[str] = mapped_column(String(32), index=True)
+    token_digest: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class NewsletterSubscriptionRow(Base):
+    __tablename__ = "newsletter_subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    consent_text: Mapped[str] = mapped_column(String(512))
+    consented_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    unsubscribed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AuthStore:
@@ -96,6 +122,57 @@ class AuthStore:
             session.add(SessionRow(user_id=user_id, token_digest=session_digest(token), csrf_digest=session_digest(csrf), created_at=now, expires_at=session_expiry(now)))
             session.commit()
         return token, csrf
+
+    def issue_token(self, user_id: int, purpose: str, ttl: timedelta = timedelta(hours=24)) -> str:
+        raw = secrets.token_urlsafe(32)
+        now = datetime.now(timezone.utc)
+        with Session(self.engine) as session:
+            session.add(AuthTokenRow(user_id=user_id, purpose=purpose, token_digest=session_digest(raw), created_at=now, expires_at=now + ttl))
+            session.commit()
+        return raw
+
+    def confirm_email(self, raw_token: str) -> bool:
+        now = datetime.now(timezone.utc)
+        with Session(self.engine) as session:
+            token = session.scalar(select(AuthTokenRow).where(AuthTokenRow.token_digest == session_digest(raw_token), AuthTokenRow.purpose == "email_verification"))
+            if token is None or token.consumed_at is not None or token.expires_at.replace(tzinfo=timezone.utc) <= now:
+                return False
+            user = session.get(UserRow, token.user_id)
+            if user is None:
+                return False
+            user.email_verified_at = now
+            token.consumed_at = now
+            session.commit()
+            return True
+
+    def start_newsletter(self, user_id: int, consent_text: str) -> str:
+        now = datetime.now(timezone.utc)
+        with Session(self.engine) as session:
+            user = session.get(UserRow, user_id)
+            if user is None:
+                raise ValueError("account not found")
+            subscription = NewsletterSubscriptionRow(user_id=user_id, email=user.email, status="pending", consent_text=consent_text[:512], consented_at=now)
+            session.add(subscription)
+            session.flush()
+            token = secrets.token_urlsafe(32)
+            session.add(AuthTokenRow(user_id=user_id, purpose="newsletter_confirmation", token_digest=session_digest(token), created_at=now, expires_at=now + timedelta(hours=48)))
+            session.commit()
+            return token
+
+    def confirm_newsletter(self, raw_token: str) -> bool:
+        now = datetime.now(timezone.utc)
+        with Session(self.engine) as session:
+            token = session.scalar(select(AuthTokenRow).where(AuthTokenRow.token_digest == session_digest(raw_token), AuthTokenRow.purpose == "newsletter_confirmation"))
+            if token is None or token.consumed_at is not None or token.expires_at.replace(tzinfo=timezone.utc) <= now:
+                return False
+            subscription = session.scalar(select(NewsletterSubscriptionRow).where(NewsletterSubscriptionRow.user_id == token.user_id, NewsletterSubscriptionRow.status == "pending"))
+            if subscription is None:
+                return False
+            subscription.status = "active"
+            subscription.confirmed_at = now
+            token.consumed_at = now
+            session.commit()
+            return True
 
     def user_for_token(self, token: str | None) -> UserRow | None:
         if not token:

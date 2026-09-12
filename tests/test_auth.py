@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from raffael.auth import (
+    AuthStore,
     hash_password,
     new_session_token,
     normalize_email,
@@ -10,6 +11,21 @@ from raffael.auth import (
     session_expiry,
     verify_password,
 )
+
+
+def test_email_and_newsletter_tokens_are_single_use(tmp_path):
+    store = AuthStore(f"sqlite:///{tmp_path / 'auth.db'}")
+    store.initialize()
+    user = store.register("owner@example.com", "a sufficiently long password")
+
+    email_token = store.issue_token(user.id, "email_verification")
+    assert store.confirm_email(email_token) is True
+    assert store.confirm_email(email_token) is False
+
+    newsletter_token = store.start_newsletter(user.id, "i want the raffael newsletter")
+    assert store.confirm_newsletter(newsletter_token) is True
+    assert store.confirm_newsletter(newsletter_token) is False
+    store.close()
 
 
 def test_normalize_email_is_stable():

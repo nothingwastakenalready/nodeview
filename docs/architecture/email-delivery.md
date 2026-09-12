@@ -3,8 +3,9 @@
 ## status
 
 Local development delivery is documented and wired through Mailpit. Account
-verification, newsletter double opt-in and unsubscribe persistence remain the
-next application slice.
+verification and newsletter double opt-in are wired to the auth store and mail
+boundary. Newsletter unsubscribe persistence remains the next application
+slice.
 
 ## environments
 
@@ -54,3 +55,10 @@ Registration confirmation and newsletter subscription are separate flows:
 An account must not be subscribed to the newsletter merely because it was
 created. Consent text, timestamp and subscription state must be retained for
 the consent record.
+
+## local verification flow
+
+When `RAFFAEL_MAIL_PROVIDER=mailpit`, registration sends the confirmation
+message to Mailpit instead of a real recipient. Open the message in the local
+inbox and follow the confirmation link. The account token is single-use and
+expires after 24 hours. Newsletter confirmation tokens expire after 48 hours.
