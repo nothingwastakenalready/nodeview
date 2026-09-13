@@ -15,6 +15,10 @@ class Service:
     interval: float = 30.0
     failure_threshold: int = 2
     success_threshold: int = 1
+    check_id: int | None = None
+    workspace_id: int | None = None
+    device_id: int | None = None
+    probe_ports: tuple[int, ...] = (22, 53, 80, 443, 445, 548, 8123, 8006, 8080, 9100)
 
 
 def load_services(path: str | Path) -> list[Service]:

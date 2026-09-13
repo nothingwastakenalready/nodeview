@@ -4,6 +4,9 @@ import { presentState, summarizeStates, type ServiceState } from "./model";
 
 const base: ServiceState = {
   name: "dns",
+  check_id: null,
+  workspace_id: null,
+  device_id: null,
   status: "up",
   latency_ms: 12,
   http_status: null,
@@ -15,16 +18,21 @@ const base: ServiceState = {
 
 describe("state presentation", () => {
   test("maps engine state to readable status semantics", () => {
-    expect(presentState(base)).toMatchObject({
+    expect(presentState({ ...base, uptime_pct: 99.5, downtime_pct: 0.5, avg_latency_ms: 14, down_events: 1 })).toMatchObject({
       label: "healthy",
       tone: "healthy",
-      latency: "12 ms"
+      latency: "12 ms",
+      uptime: "99.5%",
+      downtime: "0.5%",
+      avgLatency: "14 ms",
+      downEvents: "1"
     });
 
     expect(presentState({ ...base, status: "critical", latency_ms: null })).toMatchObject({
       label: "critical",
       tone: "critical",
-      latency: "—"
+      latency: "—",
+      uptime: "—"
     });
   });
 

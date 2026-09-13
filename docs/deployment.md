@@ -17,6 +17,8 @@ Docker Compose file. The Python suite includes Alembic tests for:
 - a fresh SQLite database upgraded to the current head
 - a database where `devices.parent_id` and `ix_devices_parent_id` already exist
   but `alembic_version` is still on `20260912_04`
+- monitoring sensor migrations through `20260913_02`, including stored sensor
+  details for current state and history rows
 
 ## Production deploy order
 
@@ -63,6 +65,7 @@ Use this order on the VM from `/opt/raffael`.
 
    ```bash
    git pull --ff-only
+   test -f .env || printf 'RAFFAEL_BIND_ADDRESS=192.168.1.147\n' > .env
    docker compose build raffael
    docker compose run --rm --no-deps raffael alembic upgrade head
    ```

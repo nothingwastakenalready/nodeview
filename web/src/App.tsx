@@ -10,7 +10,7 @@ export function App() {
   const [route, setRoute] = useState(window.location.hash || "#/dashboard");
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [states, setStates] = useState<ServiceState[]>([]);
-  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,9 +36,9 @@ export function App() {
         const data = await response.json() as ServiceState[];
         if (!active) return;
         setStates(data);
-        setSelectedName((current) => {
-          if (current && data.some((state) => state.name === current)) return current;
-          return data[0]?.name ?? null;
+        setSelectedKey((current) => {
+          if (current && data.some((state) => stateKey(state) === current)) return current;
+          return data[0] ? stateKey(data[0]) : null;
         });
         setError(null);
       } catch (reason) {
@@ -83,7 +83,11 @@ export function App() {
   return (
     <>
       {error ? <div className="stale-banner">refresh failed. showing the last state we have.</div> : null}
-      <Dashboard states={states} selectedName={selectedName} onSelect={setSelectedName} />
+      <Dashboard states={states} selectedKey={selectedKey} onSelect={setSelectedKey} />
     </>
   );
+}
+
+function stateKey(state: ServiceState): string {
+  return state.check_id == null ? state.name : `check:${state.check_id}`;
 }

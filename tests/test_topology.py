@@ -80,6 +80,7 @@ def test_proxmox_vm_service_and_minipc_topology(tmp_path):
         assert docker.status_code == 201
 
         devices = client.get("/household/devices").json()
+        assert "credential_ref" not in devices[0]
         by_name = {item["name"]: item for item in devices}
         assert by_name["Raffael-VM 105"]["parent_id"] == by_name["Proxmox"]["id"]
         assert by_name["Raffael-Web"]["parent_id"] == by_name["Raffael-VM 105"]["id"]

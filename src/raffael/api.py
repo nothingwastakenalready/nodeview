@@ -1,12 +1,13 @@
 import os
+import ipaddress
 from contextlib import asynccontextmanager
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
 from fastapi import Cookie, FastAPI, Header, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
@@ -21,6 +22,7 @@ from .households import DeviceStore, connector_catalog
 from .connectors import discover_network
 from .mailer import SmtpMailer
 from .unifi import fetch_unifi_clients
+from .monitors import CheckStore, CompositeRecorder
 
 Checker = Callable[[Service], CheckResult]
 ClientSourceLoader = Callable[[], list[ImportedClient]]
@@ -78,6 +80,34 @@ class DeviceRenameInput(BaseModel):
     name: str
 
 
+class CheckInput(BaseModel):
+    device_id: int
+    name: str
+    type: str = "http"
+    url: str | None = None
+    host: str | None = None
+    port: int | None = None
+    interval: float = 30.0
+    timeout: float = 2.0
+    failure_threshold: int = 2
+    success_threshold: int = 1
+    active: bool = True
+
+
+class CheckPatchInput(BaseModel):
+    device_id: int | None = None
+    name: str | None = None
+    type: str | None = None
+    url: str | None = None
+    host: str | None = None
+    port: int | None = None
+    interval: float | None = None
+    timeout: float | None = None
+    failure_threshold: int | None = None
+    success_threshold: int | None = None
+    active: bool | None = None
+
+
 class ClientInput(BaseModel):
     name: str
     endpoint: str | None = None
@@ -132,6 +162,8 @@ def create_app(
     runtime_history = history
     runtime_auth: AuthStore | None = None
     runtime_devices: DeviceStore | None = None
+    runtime_checks: CheckStore | None = None
+    rate_buckets: dict[tuple[str, str], list[datetime]] = {}
     runtime_mailer = mailer or SmtpMailer()
     runtime_client_source_loaders = {
         "unifi": unifi_client_loader or fetch_unifi_clients,
@@ -144,7 +176,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        nonlocal runtime_engine, runtime_history, runtime_auth, runtime_devices
+        nonlocal runtime_engine, runtime_history, runtime_auth, runtime_devices, runtime_checks
         owns_history = False
         if runtime_history is None and monitor:
             runtime_history = SqlAlchemyHistoryStore(
@@ -158,14 +190,19 @@ def create_app(
             runtime_auth.initialize()
         if runtime_auth is not None:
             runtime_devices = DeviceStore(runtime_auth.engine)
+            runtime_checks = CheckStore(runtime_auth.engine)
+            runtime_checks.ensure_default_checks()
         if runtime_engine is None and monitor:
+            services = runtime_checks.active_services() if runtime_checks is not None else load_services(path)
+            recorder = CompositeRecorder(runtime_history, runtime_checks) if runtime_checks is not None else runtime_history
             runtime_engine = MonitoringEngine(
-                load_services(path), checker=checker, history=runtime_history
+                services, checker=checker, history=recorder
             )
         app.state.engine = runtime_engine
         app.state.history = runtime_history
         app.state.auth = runtime_auth
         app.state.devices = runtime_devices
+        app.state.checks = runtime_checks
         if runtime_engine is not None:
             await runtime_engine.start()
         try:
@@ -180,9 +217,57 @@ def create_app(
 
     app = FastAPI(title="raffael", version="0.4.0", lifespan=lifespan)
 
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        response.headers.setdefault("Cross-Origin-Embedder-Policy", "require-corp")
+        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; "
+            "form-action 'self'; frame-ancestors 'none'",
+        )
+        response.headers.setdefault("Cache-Control", "no-store")
+        return response
+
+    def refresh_engine_services() -> None:
+        if runtime_engine is None or runtime_checks is None:
+            return
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(runtime_engine.replace_services(runtime_checks.active_services()))
+        else:
+            loop.create_task(runtime_engine.replace_services(runtime_checks.active_services()))
+
+    def create_default_check(workspace_id: int, device: dict) -> None:
+        if runtime_checks is None:
+            return
+        if runtime_checks.create_for_device_target(workspace_id, device) is not None:
+            refresh_engine_services()
+
     @app.get("/health")
     def health():
         return {"status": "ok"}
+
+    @app.get("/ready")
+    def ready():
+        checks_ready = runtime_checks is not None
+        history_ready = runtime_history is not None
+        scheduler_ready = runtime_engine is not None and bool(runtime_engine.states() or checks_ready)
+        status = "ok" if checks_ready and history_ready and scheduler_ready else "degraded"
+        return {
+            "status": status,
+            "database": "ok" if checks_ready and history_ready else "unavailable",
+            "scheduler": "ok" if scheduler_ready else "unavailable",
+        }
 
     def require_authenticated_user(session_token: str | None) -> object:
         if runtime_auth is None:
@@ -205,8 +290,29 @@ def create_app(
         if runtime_auth is None or not session_token or not runtime_auth.csrf_valid(session_token, csrf):
             raise HTTPException(status_code=403, detail="csrf validation failed")
 
+    def require_write_guard(request: Request, session_token: str | None, csrf: str | None) -> None:
+        require_csrf(session_token, csrf)
+        origin = request.headers.get("origin")
+        if not origin:
+            return
+        public_url = os.environ.get("RAFFAEL_PUBLIC_URL", "http://127.0.0.1:8080").rstrip("/")
+        if not origin.startswith(public_url):
+            raise HTTPException(status_code=403, detail="origin validation failed")
+
+    def rate_limit(request: Request, key: str, limit: int, window_seconds: int) -> None:
+        client = request.client.host if request.client else "unknown"
+        bucket_key = (key, client)
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(seconds=window_seconds)
+        bucket = [item for item in rate_buckets.get(bucket_key, []) if item > cutoff]
+        if len(bucket) >= limit:
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
+        bucket.append(now)
+        rate_buckets[bucket_key] = bucket
+
     @app.post("/auth/register", status_code=201)
-    def register(account: AccountInput, response: Response):
+    def register(account: AccountInput, response: Response, request: Request):
+        rate_limit(request, "register", 5, 3600)
         if runtime_auth is None:
             raise HTTPException(status_code=503, detail="authentication storage unavailable")
         try:
@@ -242,7 +348,8 @@ def create_app(
         return {"status": "subscribed"}
 
     @app.post("/auth/login")
-    def login(account: AccountInput, response: Response):
+    def login(account: AccountInput, response: Response, request: Request):
+        rate_limit(request, "login", 20, 300)
         if runtime_auth is None:
             raise HTTPException(status_code=503, detail="authentication storage unavailable")
         user = runtime_auth.authenticate(account.email, account.password)
@@ -254,7 +361,8 @@ def create_app(
         return {"id": user.id, "email": user.email, "workspaces": runtime_auth.memberships(user.id)}
 
     @app.post("/auth/password-reset/request")
-    def request_password_reset(account: PasswordResetRequest):
+    def request_password_reset(account: PasswordResetRequest, request: Request):
+        rate_limit(request, "password-reset", 5, 3600)
         if runtime_auth is None:
             raise HTTPException(status_code=503, detail="authentication storage unavailable")
         try:
@@ -294,8 +402,7 @@ def create_app(
     def logout(response: Response, request: Request, session_token: str | None = Cookie(None, alias=SESSION_COOKIE), csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE), x_csrf_token: str | None = Header(None)):
         if runtime_auth is None:
             raise HTTPException(status_code=503, detail="authentication storage unavailable")
-        if session_token and not runtime_auth.csrf_valid(session_token, x_csrf_token):
-            raise HTTPException(status_code=403, detail="csrf validation failed")
+        require_write_guard(request, session_token, x_csrf_token)
         runtime_auth.revoke(session_token)
         response.delete_cookie(SESSION_COOKIE)
         response.delete_cookie(CSRF_COOKIE)
@@ -304,6 +411,103 @@ def create_app(
     def services(session_token: str | None = Cookie(None, alias=SESSION_COOKIE)):
         require_authenticated_user(session_token)
         return [result_json(checker(service)) for service in load_services(path)]
+
+    @app.get("/checks")
+    def checks(session_token: str | None = Cookie(None, alias=SESSION_COOKIE)):
+        _, workspace_id = current_workspace(session_token)
+        if runtime_checks is None:
+            raise HTTPException(status_code=503, detail="check storage unavailable")
+        return runtime_checks.list(workspace_id)
+
+    @app.post("/checks", status_code=201)
+    def add_check(
+        request: Request,
+        check: CheckInput,
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+        x_csrf_token: str | None = Header(None),
+    ):
+        _, workspace_id = current_workspace(session_token)
+        require_write_guard(request, session_token, x_csrf_token)
+        if runtime_checks is None:
+            raise HTTPException(status_code=503, detail="check storage unavailable")
+        try:
+            created = runtime_checks.create(workspace_id, check.model_dump())
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        refresh_engine_services()
+        return created
+
+    @app.patch("/checks/{check_id}")
+    def update_check(
+        request: Request,
+        check_id: int,
+        check: CheckPatchInput,
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+        x_csrf_token: str | None = Header(None),
+    ):
+        _, workspace_id = current_workspace(session_token)
+        require_write_guard(request, session_token, x_csrf_token)
+        if runtime_checks is None:
+            raise HTTPException(status_code=503, detail="check storage unavailable")
+        try:
+            updated = runtime_checks.update(workspace_id, check_id, check.model_dump(exclude_none=True))
+        except ValueError as exc:
+            raise HTTPException(status_code=404 if "not found" in str(exc) else 400, detail=str(exc)) from exc
+        refresh_engine_services()
+        return updated
+
+    @app.delete("/checks/{check_id}", status_code=204)
+    def delete_check(
+        request: Request,
+        check_id: int,
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+        x_csrf_token: str | None = Header(None),
+    ):
+        _, workspace_id = current_workspace(session_token)
+        require_write_guard(request, session_token, x_csrf_token)
+        if runtime_checks is None:
+            raise HTTPException(status_code=503, detail="check storage unavailable")
+        try:
+            runtime_checks.delete(workspace_id, check_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        refresh_engine_services()
+
+    @app.post("/checks/{check_id}/run")
+    async def run_check(
+        request: Request,
+        check_id: int,
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+        x_csrf_token: str | None = Header(None),
+    ):
+        _, workspace_id = current_workspace(session_token)
+        require_write_guard(request, session_token, x_csrf_token)
+        if runtime_checks is None or runtime_engine is None:
+            raise HTTPException(status_code=503, detail="monitoring unavailable")
+        try:
+            runtime_checks.get(workspace_id, check_id)
+            state = await runtime_engine.run_key_once(str(check_id))
+        except (ValueError, KeyError) as exc:
+            raise HTTPException(status_code=404, detail="check not found or inactive") from exc
+        return asdict(state)
+
+    @app.get("/checks/{check_id}/history")
+    def check_history(
+        check_id: int,
+        start: datetime | None = Query(None, alias="from"),
+        end: datetime | None = Query(None, alias="to"),
+        limit: int = Query(500, ge=1, le=1000),
+        session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
+    ):
+        _, workspace_id = current_workspace(session_token)
+        if runtime_history is None:
+            return []
+        return [
+            asdict(item)
+            for item in runtime_history.history_for_check(
+                workspace_id, check_id, start=start, end=end, limit=limit
+            )
+        ]
 
     @app.get("/integrations/catalog")
     def integrations_catalog(session_token: str | None = Cookie(None, alias=SESSION_COOKIE)):
@@ -319,17 +523,17 @@ def create_app(
 
     @app.post("/household/devices", status_code=201)
     def add_household_device(
+        request: Request,
         device: DeviceInput,
         session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
-        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
         x_csrf_token: str | None = Header(None),
     ):
         _, workspace_id = current_workspace(session_token)
-        require_csrf(session_token, x_csrf_token or csrf_token)
+        require_write_guard(request, session_token, x_csrf_token)
         if runtime_devices is None:
             raise HTTPException(status_code=503, detail="device storage unavailable")
         try:
-            return runtime_devices.create(
+            created = runtime_devices.create(
                 workspace_id,
                 device.connector,
                 device.name,
@@ -338,19 +542,21 @@ def create_app(
                 device.metadata,
                 device.parent_id,
             )
+            create_default_check(workspace_id, created)
+            return created
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.patch("/household/devices/{device_id}")
     def rename_household_device(
+        request: Request,
         device_id: int,
         device: DeviceRenameInput,
         session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
-        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
         x_csrf_token: str | None = Header(None),
     ):
         _, workspace_id = current_workspace(session_token)
-        require_csrf(session_token, x_csrf_token or csrf_token)
+        require_write_guard(request, session_token, x_csrf_token)
         if runtime_devices is None:
             raise HTTPException(status_code=503, detail="device storage unavailable")
         try:
@@ -367,17 +573,17 @@ def create_app(
 
     @app.post("/household/clients", status_code=201)
     def add_household_client(
+        request: Request,
         client: ClientInput,
         session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
-        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
         x_csrf_token: str | None = Header(None),
     ):
         _, workspace_id = current_workspace(session_token)
-        require_csrf(session_token, x_csrf_token or csrf_token)
+        require_write_guard(request, session_token, x_csrf_token)
         if runtime_devices is None:
             raise HTTPException(status_code=503, detail="device storage unavailable")
         try:
-            return runtime_devices.create_client(
+            created = runtime_devices.create_client(
                 workspace_id,
                 client.name,
                 endpoint=client.endpoint,
@@ -386,20 +592,23 @@ def create_app(
                 parent_id=client.parent_id,
                 metadata=client.metadata,
             )
+            create_default_check(workspace_id, created)
+            return created
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/integrations/{source}/clients/import")
     def import_clients_from_source(
+        request: Request,
         source: str,
         config: IntegrationImportInput | None = None,
         parent_id: int | None = None,
         session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
-        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
         x_csrf_token: str | None = Header(None),
     ):
+        rate_limit(request, "client-import", 10, 3600)
         _, workspace_id = current_workspace(session_token)
-        require_csrf(session_token, x_csrf_token or csrf_token)
+        require_write_guard(request, session_token, x_csrf_token)
         if runtime_devices is None:
             raise HTTPException(status_code=503, detail="device storage unavailable")
         source_loader = runtime_client_source_loaders.get(source)
@@ -423,6 +632,7 @@ def create_app(
                     parent_id=parent_id,
                     metadata=client.metadata,
                 )
+                create_default_check(workspace_id, device)
                 devices.append(device)
                 if was_created:
                     created += 1
@@ -436,48 +646,57 @@ def create_app(
 
     @app.post("/household/discover")
     def discover_devices(
+        request_context: Request,
         request: DiscoveryInput,
         session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
-        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
         x_csrf_token: str | None = Header(None),
     ):
+        rate_limit(request_context, "discovery", 10, 3600)
         current_workspace(session_token)
-        require_csrf(session_token, x_csrf_token or csrf_token)
+        require_write_guard(request_context, session_token, x_csrf_token)
         try:
+            network = ipaddress.ip_network(request.network, strict=False)
+            if not network.is_private or network.num_addresses > 256:
+                raise ValueError("discovery is limited to private networks with at most 256 addresses")
             return [item.__dict__ for item in discover_network(request.network, workers=request.workers)]
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/household/discover/adopt", status_code=201)
     def adopt_discovered_device(
+        request: Request,
         device: DiscoveryAdoptInput,
         session_token: str | None = Cookie(None, alias=SESSION_COOKIE),
-        csrf_token: str | None = Cookie(None, alias=CSRF_COOKIE),
         x_csrf_token: str | None = Header(None),
     ):
         _, workspace_id = current_workspace(session_token)
-        require_csrf(session_token, x_csrf_token or csrf_token)
+        require_write_guard(request, session_token, x_csrf_token)
         if runtime_devices is None:
             raise HTTPException(status_code=503, detail="device storage unavailable")
         name = device.hostname or device.address
         try:
-            return runtime_devices.create(
+            created = runtime_devices.create(
                 workspace_id, "icmp", name, endpoint=device.address,
                 metadata={"role": "client", "discovered": True, "open_ports": device.open_ports},
                 parent_id=device.parent_id,
             )
+            create_default_check(workspace_id, created)
+            return created
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/check")
     def check(service: ServiceInput):
-        return result_json(checker(service.service()))
+        return JSONResponse(status_code=410, content={"detail": "raw checks are disabled; create a workspace check first"})
 
     @app.get("/state")
     def state(session_token: str | None = Cookie(None, alias=SESSION_COOKIE)):
         require_authenticated_user(session_token)
         if runtime_engine is None:
             return []
+        if runtime_checks is not None:
+            _, workspace_id = current_workspace(session_token)
+            return runtime_checks.states(workspace_id)
         return [asdict(item) for item in runtime_engine.states().values()]
 
     @app.get("/history/{service_name}")

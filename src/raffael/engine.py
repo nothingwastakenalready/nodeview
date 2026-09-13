@@ -24,10 +24,23 @@ class ServiceState:
     last_checked: datetime | None = None
     consecutive_successes: int = 0
     consecutive_failures: int = 0
+    check_id: int | None = None
+    workspace_id: int | None = None
+    device_id: int | None = None
+    details: dict | None = None
 
 
 def initial_state(service: Service) -> ServiceState:
-    return ServiceState(name=service.name)
+    return ServiceState(
+        name=service.name,
+        check_id=service.check_id,
+        workspace_id=service.workspace_id,
+        device_id=service.device_id,
+    )
+
+
+def service_key(service: Service) -> str:
+    return str(service.check_id) if service.check_id is not None else service.name
 
 
 def apply_result(
@@ -50,6 +63,10 @@ def apply_result(
             last_checked=checked_at,
             consecutive_successes=successes,
             consecutive_failures=0,
+            check_id=service.check_id,
+            workspace_id=service.workspace_id,
+            device_id=service.device_id,
+            details=result.details,
         )
 
     failures = previous.consecutive_failures + 1
@@ -62,6 +79,10 @@ def apply_result(
         last_checked=checked_at,
         consecutive_successes=0,
         consecutive_failures=failures,
+        check_id=service.check_id,
+        workspace_id=service.workspace_id,
+        device_id=service.device_id,
+        details=result.details,
     )
 
 
@@ -79,6 +100,9 @@ def apply_error(
         last_checked=checked_at,
         consecutive_successes=0,
         consecutive_failures=0,
+        check_id=service.check_id,
+        workspace_id=service.workspace_id,
+        device_id=service.device_id,
     )
 
 
@@ -92,10 +116,10 @@ class MonitoringEngine:
     ) -> None:
         if max_concurrency < 1:
             raise ValueError("max_concurrency must be at least one")
-        self._services = list(services)
+        self._services: dict[str, Service] = {service_key(service): service for service in services}
         self._checker = checker
         self._history = history
-        self._states = {service.name: initial_state(service) for service in services}
+        self._states = {service_key(service): initial_state(service) for service in services}
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._tasks: dict[str, asyncio.Task[None]] = {}
 
@@ -103,7 +127,8 @@ class MonitoringEngine:
         return dict(self._states)
 
     async def run_once(self, service: Service) -> ServiceState:
-        previous = self._states[service.name]
+        key = service_key(service)
+        previous = self._states[key]
         checked_at = datetime.now(timezone.utc)
 
         try:
@@ -114,18 +139,33 @@ class MonitoringEngine:
         else:
             state = apply_result(previous, result, service, checked_at)
 
-        self._states[service.name] = state
+        self._states[key] = state
         if self._history is not None:
             await asyncio.to_thread(self._history.record, state)
         return state
+
+    async def run_key_once(self, key: str) -> ServiceState:
+        service = self._services.get(key)
+        if service is None:
+            raise KeyError(key)
+        return await self.run_once(service)
+
+    async def replace_services(self, services: list[Service]) -> None:
+        was_running = bool(self._tasks)
+        if was_running:
+            await self.stop()
+        self._services = {service_key(service): service for service in services}
+        self._states = {key: self._states.get(key, initial_state(service)) for key, service in self._services.items()}
+        if was_running:
+            await self.start()
 
     async def start(self) -> None:
         if self._tasks:
             return
 
         self._tasks = {
-            service.name: asyncio.create_task(self._run_service(service), name=f"raffael:{service.name}")
-            for service in self._services
+            key: asyncio.create_task(self._run_service(key, service), name=f"raffael:{key}")
+            for key, service in self._services.items()
         }
 
     async def stop(self) -> None:
@@ -138,7 +178,11 @@ class MonitoringEngine:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def _run_service(self, service: Service) -> None:
+    async def _run_service(self, key: str, service: Service) -> None:
         while True:
+            current = self._services.get(key)
+            if current is None:
+                return
+            service = current
             await self.run_once(service)
             await asyncio.sleep(service.interval)

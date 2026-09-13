@@ -7,6 +7,9 @@ import type { ServiceState } from "./model";
 const states: ServiceState[] = [
   {
     name: "dns",
+    check_id: null,
+    workspace_id: null,
+    device_id: null,
     status: "up",
     latency_ms: 12,
     http_status: 200,
@@ -17,6 +20,9 @@ const states: ServiceState[] = [
   },
   {
     name: "proxy",
+    check_id: null,
+    workspace_id: null,
+    device_id: null,
     status: "warning",
     latency_ms: 87,
     http_status: null,
@@ -30,7 +36,7 @@ const states: ServiceState[] = [
 describe("Dashboard", () => {
   test("renders a compact overview and selected monitor detail", () => {
     const html = renderToStaticMarkup(
-      <Dashboard states={states} selectedName="dns" onSelect={() => undefined} />
+      <Dashboard states={states} selectedKey="dns" onSelect={() => undefined} />
     );
 
     expect(html).toContain("system overview");
@@ -43,7 +49,7 @@ describe("Dashboard", () => {
 
   test("keeps warning state readable without relying on color", () => {
     const html = renderToStaticMarkup(
-      <Dashboard states={states} selectedName="proxy" onSelect={() => undefined} />
+      <Dashboard states={states} selectedKey="proxy" onSelect={() => undefined} />
     );
 
     expect(html).toContain("warning");

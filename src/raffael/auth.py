@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from sqlalchemy import DateTime, ForeignKey, String, create_engine, select
+from sqlalchemy import func
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .history import Base
@@ -95,6 +96,8 @@ class AuthStore:
         normalized = normalize_email(email)
         now = datetime.now(timezone.utc)
         with Session(self.engine) as session:
+            if self.registration_locked() and session.scalar(select(func.count(UserRow.id))) > 0:
+                raise ValueError("registration is closed")
             if session.scalar(select(UserRow).where(UserRow.email == normalized)):
                 raise ValueError("account already exists")
             user = UserRow(email=normalized, password_hash=hash_password(password), created_at=now)
@@ -243,6 +246,9 @@ class AuthStore:
                 {"id": workspace.id, "name": workspace.name, "role": membership.role}
                 for membership, workspace in rows
             ]
+
+    def registration_locked(self) -> bool:
+        return True
 
 
 def normalize_email(email: str) -> str:

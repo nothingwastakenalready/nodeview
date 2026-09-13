@@ -78,7 +78,7 @@ def test_household_devices_use_workspace_scope_and_connector_catalog(tmp_path):
         )
         assert added.status_code == 201
         assert added.json()["status"] == "pending"
-        assert added.json()["credential_ref"] == "keychain://raffael/pve-living-room"
+        assert "credential_ref" not in added.json()
         assert client.get("/household/devices").json()[0]["name"] == "pve living room"
 
         child = client.post(
@@ -279,22 +279,103 @@ def test_services_returns_shared_check_results(tmp_path):
         "latency_ms": 7,
         "http_status": None,
         "error": None,
+        "details": None,
     }]
 
 
-def test_check_runs_one_adhoc_http_check(tmp_path):
+def test_raw_check_endpoint_is_disabled(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+
+    client = TestClient(create_app(config_path=config))
+    response = client.post("/check", json={"name": "example", "type": "http", "url": "https://example.com", "timeout": 2})
+
+    assert response.status_code == 410
+
+
+def test_checks_drive_workspace_state_and_history(tmp_path):
     config = tmp_path / "services.yaml"
     config.write_text("services: []\n")
 
     def fake_check(service: Service) -> CheckResult:
-        return CheckResult(service.name, service.url or "", "up", 12, 200, kind="http")
+        return CheckResult(service.name, service.url or service.host or "", "up", 12, 200, kind=service.type)
 
-    client = TestClient(create_app(config_path=config, checker=fake_check))
-    response = client.post("/check", json={"name": "example", "type": "http", "url": "https://example.com", "timeout": 2})
+    with TestClient(create_app(config_path=config, checker=fake_check, database_url=f"sqlite:///{tmp_path / 'auth.db'}", monitor=True)) as client:
+        registered = client.post("/auth/register", json={"email": "owner@example.com", "password": "a sufficiently long password"})
+        assert registered.status_code == 201
+        csrf = client.cookies.get("raffael_csrf")
+        headers = {"X-CSRF-Token": csrf}
 
-    assert response.status_code == 200
-    assert response.json()["status"] == "up"
-    assert response.json()["latency_ms"] == 12
+        device = client.post(
+            "/household/devices",
+            headers=headers,
+            json={"connector": "generic", "name": "Raffael API"},
+        )
+        assert device.status_code == 201
+        created = client.post(
+            "/checks",
+            headers=headers,
+            json={"device_id": device.json()["id"], "name": "Raffael API", "type": "http", "url": "http://127.0.0.1:8080/health", "interval": 60},
+        )
+        assert created.status_code == 201
+        check_id = created.json()["id"]
+
+        run = client.post(f"/checks/{check_id}/run", headers=headers)
+        assert run.status_code == 200
+        assert run.json()["status"] == "up"
+        assert run.json()["check_id"] == check_id
+
+        state = client.get("/state")
+        assert state.status_code == 200
+        assert state.json()[0]["device_id"] == device.json()["id"]
+        assert state.json()[0]["status"] == "up"
+        assert state.json()[0]["uptime_pct"] == 100.0
+        assert state.json()[0]["downtime_pct"] == 0.0
+        assert state.json()[0]["avg_latency_ms"] == 12
+        assert state.json()[0]["availability_samples"] == 1
+
+        history = client.get(f"/checks/{check_id}/history")
+        assert history.status_code == 200
+        assert history.json()[0]["check_id"] == check_id
+
+
+def test_client_with_http_endpoint_gets_default_monitor(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    with TestClient(create_app(config_path=config, database_url=f"sqlite:///{tmp_path / 'auth.db'}", monitor=True)) as client:
+        client.post("/auth/register", json={"email": "owner@example.com", "password": "a sufficiently long password"})
+        csrf = client.cookies.get("raffael_csrf")
+        created = client.post(
+            "/household/clients",
+            headers={"X-CSRF-Token": csrf},
+            json={"name": "raffael", "connector": "generic", "endpoint": "http://127.0.0.1:8080/health"},
+        )
+
+        assert created.status_code == 201
+        checks = client.get("/checks")
+        assert checks.status_code == 200
+        assert checks.json()[0]["device_id"] == created.json()["id"]
+        assert checks.json()[0]["type"] == "http"
+        assert checks.json()[0]["url"] == "http://127.0.0.1:8080/health"
+
+
+def test_plain_ip_client_gets_auto_tcp_monitor(tmp_path):
+    config = tmp_path / "services.yaml"
+    config.write_text("services: []\n")
+    with TestClient(create_app(config_path=config, database_url=f"sqlite:///{tmp_path / 'auth.db'}", monitor=True)) as client:
+        client.post("/auth/register", json={"email": "owner@example.com", "password": "a sufficiently long password"})
+        csrf = client.cookies.get("raffael_csrf")
+        created = client.post(
+            "/household/clients",
+            headers={"X-CSRF-Token": csrf},
+            json={"name": "phone", "connector": "icmp", "endpoint": "192.168.1.55"},
+        )
+
+        assert created.status_code == 201
+        checks = client.get("/checks")
+        assert checks.status_code == 200
+        assert checks.json()[0]["type"] == "tcp_auto"
+        assert checks.json()[0]["host"] == "192.168.1.55"
 
 
 def test_state_returns_engine_snapshot(tmp_path):
@@ -382,6 +463,10 @@ def test_history_returns_bounded_measurements_for_a_service(tmp_path):
             "http_status": 200,
             "error": None,
             "checked_at": "2026-09-12T08:01:00+00:00",
+            "workspace_id": None,
+            "device_id": None,
+            "check_id": None,
+            "details": None,
         }
     ]
 

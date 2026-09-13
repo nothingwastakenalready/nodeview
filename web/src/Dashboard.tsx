@@ -6,8 +6,8 @@ import { Logo } from "./Logo";
 
 interface DashboardProps {
   states: ServiceState[];
-  selectedName: string | null;
-  onSelect: (name: string) => void;
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
 }
 
 interface HouseholdDevice {
@@ -18,6 +18,18 @@ interface HouseholdDevice {
   parent_id: number | null;
   metadata: Record<string, unknown>;
   status: string;
+}
+
+interface CheckConfig {
+  id: number;
+  device_id: number;
+  name: string;
+  type: "http" | "tcp" | "tcp_auto";
+  url: string | null;
+  host: string | null;
+  port: number | null;
+  interval: number;
+  active: boolean;
 }
 
 const summaryOrder: Array<Exclude<StatusTone, "unknown"> | "unknown"> = [
@@ -37,6 +49,12 @@ function checkedLabel(value: string | null): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+function detailValue(value: string | number | boolean | null): string {
+  if (value === null) return "—";
+  if (typeof value === "boolean") return value ? "yes" : "no";
+  return String(value);
+}
+
 function constellationPosition(index: number, total: number): { x: number; y: number } {
   const columns = Math.max(3, Math.ceil(Math.sqrt(total * 1.8)));
   const column = index % columns;
@@ -45,6 +63,25 @@ function constellationPosition(index: number, total: number): { x: number; y: nu
     x: 14 + (column / Math.max(1, columns - 1)) * 72 + (row % 2 ? 5 : 0),
     y: 34 + (row % 3) * 25
   };
+}
+
+function stateKey(state: ServiceState): string {
+  return state.check_id == null ? state.name : `check:${state.check_id}`;
+}
+
+function statusRank(tone: StatusTone): number {
+  return { critical: 5, warning: 4, unknown: 3, pending: 2, healthy: 1 }[tone];
+}
+
+function primarySensor(states: ServiceState[]): ServiceState | null {
+  return states
+    .slice()
+    .sort((left, right) => statusRank(presentState(right).tone) - statusRank(presentState(left).tone))
+    [0] ?? null;
+}
+
+function average(values: number[]): number | null {
+  return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
 }
 
 type Point = { x: number; y: number };
@@ -94,9 +131,9 @@ function topologyTemplate(nodes: HouseholdDevice[]): { name: string; positions: 
   return { name: template.name, positions };
 }
 
-export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
+export function Dashboard({ states, selectedKey, onSelect }: DashboardProps) {
   const summary = summarizeStates(states);
-  const selected = states.find((state) => state.name === selectedName) ?? states[0] ?? null;
+  const selected = states.find((state) => stateKey(state) === selectedKey) ?? states[0] ?? null;
   const healthRate = summary.total === 0 ? null : Math.round((summary.healthy / summary.total) * 100);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>(() => {
     try {
@@ -118,6 +155,8 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   const [editingDevice, setEditingDevice] = useState<HouseholdDevice | null>(null);
   const [devices, setDevices] = useState<HouseholdDevice[]>([]);
   const [clients, setClients] = useState<HouseholdDevice[]>([]);
+  const [checks, setChecks] = useState<CheckConfig[]>([]);
+  const [checkMessage, setCheckMessage] = useState<string | null>(null);
   const managedDevices = devices.filter((device) => device.metadata.role !== "client");
   const draggedRef = useRef(false);
 
@@ -137,16 +176,48 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
 
   async function refreshDevices() {
     try {
-      const [deviceResponse, clientResponse] = await Promise.all([
+      const [deviceResponse, clientResponse, checkResponse] = await Promise.all([
         fetch("/household/devices"),
         fetch("/household/clients"),
+        fetch("/checks"),
       ]);
       setDevices(deviceResponse.ok ? await deviceResponse.json() as HouseholdDevice[] : []);
       setClients(clientResponse.ok ? await clientResponse.json() as HouseholdDevice[] : []);
+      setChecks(checkResponse.ok ? await checkResponse.json() as CheckConfig[] : []);
     } catch {
       setDevices([]);
       setClients([]);
+      setChecks([]);
     }
+  }
+
+  async function addMonitor(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const type = String(form.get("type") || "http");
+    const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
+    const payload = {
+      device_id: Number(form.get("device_id")),
+      name: form.get("name"),
+      type,
+      url: type === "http" ? form.get("url") || null : null,
+      host: type === "tcp" || type === "tcp_auto" ? form.get("host") || null : null,
+      port: type === "tcp" ? Number(form.get("port")) : null,
+      interval: Number(form.get("interval") || 30),
+    };
+    const response = await fetch("/checks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}) },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => null) as { detail?: string } | null;
+      setCheckMessage(detail?.detail || "could not add sensor");
+      return;
+    }
+    setCheckMessage("sensor added");
+    await refreshDevices();
+    event.currentTarget.reset();
   }
 
   function positionFor(name: string, index: number, total = states.length): { x: number; y: number } {
@@ -249,49 +320,6 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
     setSourceImportMessage(`${result.created} added, ${result.updated} updated`);
   }
 
-  async function importDemoInfrastructure() {
-    setSourceImportMessage("adding infrastructure");
-    const csrf = document.cookie.match(/(?:^|; )raffael_csrf=([^;]+)/)?.[1];
-    const headers = { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {}) };
-    const inventory = [
-      { name: "Proxmox pve", connector: "proxmox", endpoint: "https://192.168.1.20:8006", metadata: { role: "infrastructure", source: "website-demo" } },
-      { name: "CT 100 - pihole", connector: "icmp", endpoint: "192.168.80.10", metadata: { role: "service", source: "website-demo", proxmox_id: 100 } },
-      { name: "CT 101 - npm", connector: "icmp", endpoint: "192.168.80.11", metadata: { role: "service", source: "website-demo", proxmox_id: 101 } },
-      { name: "CT 102 - wireguard", connector: "icmp", endpoint: "192.168.80.12", metadata: { role: "service", source: "website-demo", proxmox_id: 102 } },
-      { name: "CT 103 - kleiderschrank", connector: "icmp", endpoint: null, metadata: { role: "service", source: "website-demo", proxmox_id: 103, state: "stopped" } },
-      { name: "CT 104 - aurelia", connector: "icmp", endpoint: "192.168.80.13", metadata: { role: "service", source: "website-demo", proxmox_id: 104 } },
-      { name: "CT 106 - warenkorb", connector: "icmp", endpoint: "192.168.1.85", metadata: { role: "service", source: "website-demo", proxmox_id: 106 } },
-      { name: "CT 107 - matterbridge", connector: "icmp", endpoint: "192.168.1.177", metadata: { role: "service", source: "website-demo", proxmox_id: 107 } },
-      { name: "VM 105 - raffael", connector: "icmp", endpoint: "192.168.1.147", metadata: { role: "infrastructure", source: "website-demo", proxmox_id: 105 } },
-      { name: "VM 200 - homeassistant", connector: "icmp", endpoint: null, metadata: { role: "service", source: "website-demo", proxmox_id: 200 } },
-      { name: "Raffael Web", connector: "generic", endpoint: "http://192.168.1.147:8080/health", metadata: { role: "service", source: "website-demo" } },
-    ];
-    let current = devices;
-    let created = 0;
-    try {
-      let parent = current.find((device) => device.name === "Proxmox pve");
-      if (!parent) {
-        const response = await fetch("/household/devices", { method: "POST", headers, body: JSON.stringify(inventory[0]) });
-        if (!response.ok) throw new Error("could not add Proxmox");
-        parent = await response.json() as HouseholdDevice;
-        current = [...current, parent];
-        created += 1;
-      }
-      for (const item of inventory.slice(1)) {
-        if (current.some((device) => device.name === item.name)) continue;
-        const response = await fetch("/household/devices", { method: "POST", headers, body: JSON.stringify({ ...item, parent_id: parent.id }) });
-        if (!response.ok) throw new Error(`could not add ${item.name}`);
-        const createdDevice = await response.json() as HouseholdDevice;
-        current = [...current, createdDevice];
-        created += 1;
-      }
-      setDevices(current);
-      setSourceImportMessage(`${created} infrastructure entries added`);
-    } catch (error) {
-      setSourceImportMessage(error instanceof Error ? error.message : "infrastructure import failed");
-    }
-  }
-
   async function renameDevice(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editingDevice) return;
@@ -311,10 +339,27 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
   }
 
   const stateByName = new Map(states.map((state) => [state.name, state]));
+  const sensorsByDevice = new Map<number, ServiceState[]>();
+  for (const state of states) {
+    if (state.device_id === null) continue;
+    const bucket = sensorsByDevice.get(state.device_id) ?? [];
+    bucket.push(state);
+    sensorsByDevice.set(state.device_id, bucket);
+  }
   const constellationNodes: HouseholdDevice[] = devices.length
     ? devices
     : states.map((state, index) => ({ id: -(index + 1), name: state.name, connector: "", endpoint: null, parent_id: null, metadata: {}, status: "" } as HouseholdDevice));
   const constellation = topologyTemplate(constellationNodes);
+  const selectedDevice = selected?.device_id !== null && selected?.device_id !== undefined
+    ? devices.find((device) => device.id === selected.device_id) ?? null
+    : null;
+  const selectedSensors = selectedDevice
+    ? sensorsByDevice.get(selectedDevice.id) ?? []
+    : selected
+      ? [selected]
+      : [];
+  const selectedLatencies = selectedSensors.map((sensor) => sensor.latency_ms).filter((value): value is number => value !== null);
+  const selectedAverageLatency = average(selectedLatencies);
 
   return (
     <div className="shell">
@@ -337,14 +382,13 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
             <button className="add-client-button" type="button" aria-label="discover network" onClick={() => setShowDiscover(true)}>⌁</button>
             <button className="add-client-button" type="button" aria-label="add client" onClick={() => setShowAddClient(true)}>+</button>
             <div className="live-indicator"><span /> monitoring</div>
-            <a className="account-link" href="#/login">sign in</a>
           </div>
         </header>
 
         <section className="summary" aria-label="Current status summary">
           <div className="summary-total">
             <strong>{summary.total}</strong>
-            <span>monitors</span>
+            <span>sensors</span>
           </div>
           {summaryOrder.map((tone) => (
             <div className={`summary-item tone-${tone}`} key={tone}>
@@ -359,7 +403,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
           <article className="metric-widget metric-widget-wide">
             <div className="widget-label">monitoring posture</div>
             <div className="widget-value">{healthRate === null ? "—" : `${healthRate}%`}</div>
-            <div className="widget-caption">healthy monitors</div>
+            <div className="widget-caption">healthy sensors</div>
             <div className="dot-meter" aria-hidden="true">
               {Array.from({ length: 20 }, (_, index) => <i className={healthRate !== null && index < Math.round(healthRate / 5) ? "is-on" : ""} key={index} />)}
             </div>
@@ -385,11 +429,11 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                 <p className="section-kicker">current state</p>
                 <h2 id="overview-title">client constellation</h2>
               </div>
-              <div className="panel-heading-actions"><span className="panel-meta">{states.length} configured</span><button className="add-client-button" type="button" aria-label="add client" onClick={() => setShowAddClient(true)}>+</button></div>
+              <div className="panel-heading-actions"><button className="add-client-button" type="button" aria-label="add client" onClick={() => setShowAddClient(true)}>+</button></div>
             </div>
                 <p className="topology-note">{constellation.name}: detected from known topology relationships.</p>
 
-            {states.length === 0 ? (
+            {constellationNodes.length === 0 ? (
               <div className="empty-state">nothing configured yet.</div>
             ) : (
               <div className="star-grid">
@@ -403,9 +447,12 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                   })}
                 </svg>
                 {constellationNodes.map((node, index) => {
-                  const state = stateByName.get(node.name);
-                  const view = state ? presentState(state) : { tone: "pending" as const, label: "pending", latency: "—" };
-                  const selectedClass = selected?.name === node.name ? " is-selected" : "";
+                  const nodeSensors = sensorsByDevice.get(node.id) ?? [];
+                  const state = primarySensor(nodeSensors) ?? stateByName.get(node.name);
+                  const view = state
+                    ? presentState(state)
+                    : { tone: "pending" as const, label: "pending", latency: "—", uptime: "—", downtime: "—", avgLatency: "—", downEvents: "—" };
+                  const selectedClass = selected && selected.device_id === node.id ? " is-selected" : "";
                   const position = positionFor(node.name, index, constellationNodes.length);
                   return (
                     <button
@@ -413,7 +460,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                       key={node.id}
                       type="button"
                       style={{ left: `${position.x}%`, top: `${position.y}%` }}
-                      onClick={() => { if (draggedRef.current) { draggedRef.current = false; return; } if (state) onSelect(state.name); }}
+                      onClick={() => { if (draggedRef.current) { draggedRef.current = false; return; } if (state) onSelect(stateKey(state)); }}
                       onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDragging(node.name); draggedRef.current = false; }}
                       onPointerMove={(event) => moveStar(event, node.name)}
                       onPointerUp={(event) => { event.currentTarget.releasePointerCapture(event.pointerId); setDragging(null); }}
@@ -426,7 +473,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                       </svg>
                       <span className="star-inner">
                         <span className="star-name">{node.name}</span>
-                        <span className="star-status"><span className="status-dot" />{view.label}</span>
+                        <span className="star-status"><span className="status-dot" />{view.label}{nodeSensors.length > 1 ? ` · ${nodeSensors.length}` : ""}</span>
                       </span>
                     </button>
                   );
@@ -442,19 +489,41 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                 <>
                   <div className="detail-head">
                     <div>
-                      <p className="section-kicker">selected monitor</p>
-                      <h2>{selected.name}</h2>
+                      <p className="section-kicker">selected device</p>
+                      <h2>{selectedDevice?.name ?? selected.name}</h2>
                     </div>
                     <span className={`status-pill tone-${view.tone}`}><span className="status-dot" />{view.label}</span>
                   </div>
 
                   <div className="latency-block">
-                    <span>latency now</span>
-                    <strong>{view.latency}</strong>
-                    <small>history is recording.</small>
+                    <span>{selectedDevice ? "device latency average" : "latency now"}</span>
+                    <strong>{selectedAverageLatency === null ? view.latency : `${selectedAverageLatency} ms`}</strong>
+                    <small>{selectedSensors.length} sensor{selectedSensors.length === 1 ? "" : "s"} under this star.</small>
                   </div>
 
                   <dl className="detail-list">
+                    <div>
+                      <dt>uptime</dt>
+                      <dd>{view.uptime}</dd>
+                    </div>
+                    <div>
+                      <dt>downtime</dt>
+                      <dd>{view.downtime}</dd>
+                    </div>
+                    <div>
+                      <dt>avg latency</dt>
+                      <dd>{view.avgLatency}</dd>
+                    </div>
+                    <div>
+                      <dt>down events</dt>
+                      <dd>{view.downEvents}</dd>
+                    </div>
+                    {selected.details ? Object.entries(selected.details).slice(0, 6).map(([key, value]) => (
+                      <div key={key}>
+                        <dt>{key.replaceAll("_", " ")}</dt>
+                        <dd>{detailValue(value)}</dd>
+                      </div>
+                    )) : null}
                     <div>
                       <dt>last checked</dt>
                       <dd>{checkedLabel(selected.last_checked)}</dd>
@@ -477,6 +546,23 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
                     <span>last error</span>
                     <p>{selected.error ?? "none"}</p>
                   </div>
+
+                  <div className="clients-table" role="table" aria-label="Device sensors">
+                    <div className="clients-row clients-row-head" role="row"><span role="columnheader">sensor</span><span role="columnheader">status</span><span role="columnheader">latency</span><span role="columnheader">uptime</span><span role="columnheader">target</span></div>
+                    {selectedSensors.map((sensor) => {
+                      const sensorView = presentState(sensor);
+                      const target = sensor.details?.target ?? sensor.details?.host ?? (sensor.http_status === null ? "tcp" : "http");
+                      return (
+                        <div className="clients-row" role="row" key={stateKey(sensor)}>
+                          <strong role="cell">{sensor.name}</strong>
+                          <span role="cell">{sensorView.label}</span>
+                          <span role="cell">{sensorView.latency}</span>
+                          <span role="cell">{sensorView.uptime}</span>
+                          <span role="cell">{detailValue(target)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </>
               );
             })() : (
@@ -495,10 +581,34 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               const members = states.filter((state) => presentState(state).tone === tone);
               return <article className={`cluster-card tone-${tone}`} key={tone}>
                 <div className="cluster-title"><span className="status-dot" />{tone}<strong>{members.length}</strong></div>
-                <div className="cluster-members">{members.length ? members.map((member) => <button type="button" key={member.name} onClick={() => onSelect(member.name)}>{member.name}</button>) : <span>none</span>}</div>
+                <div className="cluster-members">{members.length ? members.map((member) => <button type="button" key={stateKey(member)} onClick={() => onSelect(stateKey(member))}>{member.name}</button>) : <span>none</span>}</div>
               </article>;
             })}
           </div>
+        </section>
+
+        <section className="clients-section" aria-labelledby="checks-title">
+          <div className="panel-heading">
+            <div><p className="section-kicker">active checks</p><h2 id="checks-title">sensors</h2></div>
+            <span className="panel-meta">{checks.length} configured</span>
+          </div>
+          <form className="monitor-form" onSubmit={addMonitor}>
+            <label><span className="sr-only">device</span><select name="device_id" aria-label="device" required><option value="">choose device</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}</select></label>
+            <label><span className="sr-only">name</span><input name="name" aria-label="sensor name" placeholder="sensor name" required /></label>
+            <label><span className="sr-only">type</span><select name="type" aria-label="type" defaultValue="http"><option value="http">http</option><option value="tcp">tcp</option><option value="tcp_auto">auto tcp</option></select></label>
+            <label><span className="sr-only">url</span><input name="url" aria-label="http url" placeholder="https://host/health" /></label>
+            <label><span className="sr-only">host</span><input name="host" aria-label="tcp host" placeholder="tcp host" /></label>
+            <label><span className="sr-only">port</span><input name="port" aria-label="tcp port" type="number" min="1" max="65535" placeholder="port" /></label>
+            <label><span className="sr-only">interval</span><input name="interval" aria-label="interval seconds" type="number" min="1" defaultValue="30" /></label>
+            <button className="client-dialog-submit" type="submit"><span>+</span> add sensor</button>
+          </form>
+          {checkMessage ? <p className="client-dialog-message" role="status">{checkMessage}</p> : null}
+          {checks.length === 0 ? <div className="clients-empty">no sensors saved yet.</div> : (
+            <div className="clients-table" role="table" aria-label="Saved sensors">
+              <div className="clients-row clients-row-head" role="row"><span role="columnheader">name</span><span role="columnheader">device</span><span role="columnheader">target</span><span role="columnheader">type</span><span role="columnheader">interval</span></div>
+              {checks.map((check) => <div className="clients-row" role="row" key={check.id}><strong role="cell">{check.name}</strong><span role="cell">{devices.find((device) => device.id === check.device_id)?.name ?? `#${check.device_id}`}</span><span role="cell">{check.type === "http" ? check.url : check.type === "tcp_auto" ? `${check.host}:auto` : `${check.host}:${check.port}`}</span><span role="cell">{check.type}</span><span role="cell">{check.interval}s</span></div>)}
+            </div>
+          )}
         </section>
 
         <section className="clients-section" aria-labelledby="clients-title">
@@ -572,7 +682,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
             <section className="client-dialog" role="dialog" aria-modal="true" aria-labelledby="discover-title" onClick={(event) => event.stopPropagation()}>
               <button className="client-dialog-close" type="button" aria-label="close" onClick={() => setShowDiscover(false)}>×</button>
               <p className="section-kicker">raffael / discovery</p><h2 id="discover-title">scan network</h2>
-              <form className="client-dialog-form" onSubmit={discover}><label><span className="sr-only">network</span><input name="network" aria-label="network" defaultValue="192.168.1.0/24" required /></label><button className="client-dialog-submit" type="submit">scan</button></form>
+              <form className="client-dialog-form" onSubmit={discover}><label><span className="sr-only">network</span><input name="network" aria-label="network" placeholder="private network cidr" required /></label><button className="client-dialog-submit" type="submit">scan</button></form>
               {discoveryMessage ? <p className="client-dialog-message" role="status">{discoveryMessage}</p> : null}
               {discovered.length ? <div className="cluster-members">{discovered.map((item) => <span key={item.address}>{item.hostname || item.address}{item.open_ports.length ? ` · ${item.open_ports.join(", ")}` : ""}<button type="button" onClick={() => adopt(item)} aria-label={`add ${item.address}`}>+</button></span>)}</div> : null}
             </section>
@@ -586,8 +696,7 @@ export function Dashboard({ states, selectedName, onSelect }: DashboardProps) {
               <h2 id="source-import-title">import clients</h2>
               <form className="client-dialog-form" onSubmit={importClientsFromSource}>
                 <label><span className="sr-only">source</span><select name="source" aria-label="source" defaultValue="unifi"><option value="unifi">unifi network</option><option value="api">generic api</option><option value="snmp">snmp targets</option><option value="demo">Raffael test inventory</option></select></label>
-                <button className="client-dialog-submit" type="button" onClick={importDemoInfrastructure}><span>+</span> add test inventory</button>
-                <label><span className="sr-only">UniFi URL</span><input name="url" aria-label="UniFi URL" placeholder="https://192.168.1.1" /></label>
+                <label><span className="sr-only">UniFi URL</span><input name="url" aria-label="UniFi URL" placeholder="https://unifi.local" /></label>
                 <label><span className="sr-only">UniFi site</span><input name="site" aria-label="UniFi site" placeholder="default" defaultValue="default" /></label>
                 <label><span className="sr-only">UniFi API key</span><input name="api_key" aria-label="UniFi API key" type="password" placeholder="API key (optional)" /></label>
                 <p className="client-dialog-message">Raffael erkennt lokale UniFi-API und Site automatisch.</p>

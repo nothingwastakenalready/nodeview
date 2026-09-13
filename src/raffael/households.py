@@ -232,7 +232,6 @@ def serialize_device(row: DeviceRow) -> dict:
         "connector": row.connector,
         "name": row.name,
         "endpoint": row.endpoint,
-        "credential_ref": row.credential_ref,
         "metadata": metadata,
         "status": row.status,
         "created_at": row.created_at.isoformat(),

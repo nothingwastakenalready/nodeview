@@ -24,14 +24,16 @@ def current_revision(database_path: Path) -> str:
         engine.dispose()
 
 
-def device_schema(database_path: Path) -> tuple[set[str], set[str], set[str]]:
+def schema(database_path: Path) -> tuple[set[str], set[str], set[str], set[str], set[str]]:
     engine = create_engine(f"sqlite:///{database_path}")
     try:
         inspector = inspect(engine)
-        columns = {column["name"] for column in inspector.get_columns("devices")}
+        device_columns = {column["name"] for column in inspector.get_columns("devices")}
+        check_state_columns = {column["name"] for column in inspector.get_columns("check_states")} if "check_states" in inspector.get_table_names() else set()
+        measurement_columns = {column["name"] for column in inspector.get_columns("measurements")} if "measurements" in inspector.get_table_names() else set()
         indexes = {index["name"] for index in inspector.get_indexes("devices")}
         tables = set(inspector.get_table_names())
-        return columns, indexes, tables
+        return device_columns, indexes, tables, check_state_columns, measurement_columns
     finally:
         engine.dispose()
 
@@ -41,11 +43,15 @@ def test_alembic_upgrades_fresh_sqlite_database_to_head(tmp_path):
 
     command.upgrade(alembic_config(database_path), "head")
 
-    columns, indexes, tables = device_schema(database_path)
-    assert current_revision(database_path) == "20260912_05"
+    columns, indexes, tables, check_state_columns, measurement_columns = schema(database_path)
+    assert current_revision(database_path) == "20260913_02"
     assert "parent_id" in columns
     assert "ix_devices_parent_id" in indexes
     assert "_alembic_tmp_devices" not in tables
+    assert "checks" in tables
+    assert "check_states" in tables
+    assert "details_json" in check_state_columns
+    assert "details_json" in measurement_columns
 
 
 def test_parent_migration_recovers_database_already_changed_but_not_stamped(tmp_path):
@@ -64,8 +70,10 @@ def test_parent_migration_recovers_database_already_changed_but_not_stamped(tmp_
 
     command.upgrade(config, "head")
 
-    columns, indexes, tables = device_schema(database_path)
-    assert current_revision(database_path) == "20260912_05"
+    columns, indexes, tables, check_state_columns, measurement_columns = schema(database_path)
+    assert current_revision(database_path) == "20260913_02"
     assert "parent_id" in columns
     assert "ix_devices_parent_id" in indexes
     assert "_alembic_tmp_devices" not in tables
+    assert "details_json" in check_state_columns
+    assert "details_json" in measurement_columns

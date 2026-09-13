@@ -119,6 +119,10 @@ see `docs/architecture/product-vision.md`, `docs/architecture/roadmap.md` and `d
 The reproducible Proxmox/Mini-PC hierarchy test is documented in
 `docs/architecture/proxmox-minipc-test.md`.
 
+The monitoring data model is documented in
+`docs/architecture/monitoring-sensors.md`: one star remains one device, while
+multiple executable sensors can run underneath it.
+
 ## dev
 
 ```bash
