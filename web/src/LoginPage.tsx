@@ -68,7 +68,6 @@ export function LoginPage({ onAuthenticated, register = false }: LoginPageProps)
         <Logo light className="login-large-logo" />
       </section>
       <section className="minimal-login-card" aria-labelledby="login-title">
-        <a className="create-link" href="#/register">Create account</a>
         <form onSubmit={submitLogin}>
           <label><span className="sr-only">Email</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="Email" required autoFocus /></label>
           {step === "password" ? <label><span className="sr-only">Password</span><input type="password" name="password" autoComplete="current-password" placeholder="Password" minLength={12} required autoFocus /></label> : null}
@@ -76,8 +75,10 @@ export function LoginPage({ onAuthenticated, register = false }: LoginPageProps)
         </form>
         {error ? <p className="login-note" role="alert">{error}</p> : null}
         {step === "password" ? <button className="login-back-step" type="button" onClick={() => setStep("email")}>Use a different email</button> : null}
-        <button className="back-link" type="button" onClick={() => { setResetMode(true); setStep("email"); }}>forgot password?</button>
-        <a className="back-link" href="#/register">Create a new account</a>
+        <div className="login-secondary-actions">
+          <button className="back-link" type="button" onClick={() => { setResetMode(true); setStep("email"); }}>forgot password?</button>
+          <a className="back-link" href="#/register">Create a new account</a>
+        </div>
       </section>
     </main>
   );
