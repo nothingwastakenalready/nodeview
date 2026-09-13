@@ -1,13 +1,13 @@
 # configuration
 
-Raffael is configured through environment variables. For Docker Compose, copy
+raffael is configured through environment variables. for docker compose, copy
 the example file and edit it:
 
 ```bash
 cp .env.example .env
 ```
 
-The default config is private to the machine running Docker.
+the default config is private to the machine running docker.
 
 ## network
 
@@ -23,10 +23,10 @@ RAFFAEL_PUBLIC_URL=http://127.0.0.1:8080
 published.
 
 `RAFFAEL_PUBLIC_URL` is used for links in emails, especially password reset
-links. If the app is opened through a LAN IP, this value must use the same LAN
+links. if the app is opened through a lan ip, this value must use the same lan
 address.
 
-LAN example:
+lan example:
 
 ```env
 RAFFAEL_BIND_ADDRESS=192.168.1.50
@@ -34,11 +34,11 @@ RAFFAEL_MAILPIT_BIND_ADDRESS=192.168.1.50
 RAFFAEL_PUBLIC_URL=http://192.168.1.50:8080
 ```
 
-Do not expose Raffael directly to the public internet.
+do not expose raffael directly to the public internet.
 
 ## local mail
 
-The default mail setup uses Mailpit:
+the default mail setup uses mailpit:
 
 ```env
 RAFFAEL_MAIL_PROVIDER=mailpit
@@ -47,15 +47,15 @@ RAFFAEL_SMTP_PORT=1025
 RAFFAEL_MAIL_FROM=no-reply@localhost
 ```
 
-Mailpit catches messages locally. It does not send real email.
+mailpit catches messages locally. it does not send real email.
 
-Default inbox:
+default inbox:
 
 ```text
 http://127.0.0.1:8025
 ```
 
-LAN inbox, if `RAFFAEL_MAILPIT_BIND_ADDRESS` is set to a LAN IP:
+lan inbox, if `RAFFAEL_MAILPIT_BIND_ADDRESS` is set to a lan ip:
 
 ```text
 http://192.168.1.50:8025
@@ -63,7 +63,7 @@ http://192.168.1.50:8025
 
 ## production smtp
 
-Real SMTP is optional and should use an untracked `.env` file or a secret store.
+real smtp is optional and should use an untracked `.env` file or a secret store.
 
 ```env
 RAFFAEL_MAIL_PROVIDER=smtp
@@ -76,11 +76,11 @@ RAFFAEL_MAIL_FROM=notifications@example.org
 RAFFAEL_PUBLIC_URL=https://monitor.example.org
 ```
 
-Never commit SMTP passwords, API keys or tokens.
+never commit smtp passwords, api keys or tokens.
 
 ## optional integrations
 
-These are placeholders for current and upcoming integrations:
+these are placeholders for current and upcoming integrations:
 
 ```env
 RAFFAEL_UNIFI_URL=
@@ -98,4 +98,4 @@ RAFFAEL_SNMP_COMMUNITY=public
 RAFFAEL_SNMP_PORT=161
 ```
 
-Leave them empty until the integration is configured.
+leave them empty until the integration is configured.
