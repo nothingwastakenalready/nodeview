@@ -13,3 +13,4 @@ services.yaml
 uv.lock
 backups/
 security-reports/
+docs/work-orders/

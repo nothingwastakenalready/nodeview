@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: security reports
+    url: https://github.com/nothingwastakenalready/raffael/security/advisories/new
+    about: please report real vulnerabilities privately when possible.
