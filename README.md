@@ -103,11 +103,19 @@ PATCH /checks/{check_id}
 DELETE /checks/{check_id}
 GET  /checks/{check_id}/history
 POST /checks/{check_id}/run
+GET  /household/devices
+POST /household/devices
+PATCH /household/devices/{device_id}
+GET  /household/clients
+POST /household/clients
+POST /integrations/{source}/clients/import
+POST /household/discover
+POST /household/discover/adopt
 ```
 
 `/ready` checks database and scheduler readiness. `/state` shows the current
 workspace-filtered monitoring state. `/checks` manages stored sensors. the old
-raw `/check` endpoint is intentionally gone for normal use.
+raw `/check` endpoint only remains as a `410 gone` compatibility stub.
 
 config is still deliberately boring:
 
@@ -142,7 +150,9 @@ npm run dev
 
 vite proxies the raffael api during development. the production docker image builds the frontend and serves it from fastapi, so there is no second service to operate.
 
-the current screen uses services as overview tiles because the real node/workspace model does not exist yet. that is temporary and documented in `docs/architecture/ui.md`.
+the current screen uses devices as stars and sensors underneath them. it is
+already real monitoring data, but not yet the final node/workspace graph
+described in `docs/architecture/ui.md`.
 
 ## where this is going
 
@@ -152,7 +162,8 @@ raffael is heading toward a small self-hosted monitoring thing with history, use
 
 not all at once. that would be how this becomes terrible.
 
-v0.4 has started with durable measurement history. retention, uptime aggregation and state-change events are the next pieces of that backend slice.
+durable measurement history is in place. retention, richer charts and
+state-change events are the next pieces of that backend slice.
 
 see `docs/architecture/product-vision.md`, `docs/architecture/roadmap.md` and `docs/architecture/ui.md` for the longer version.
 
