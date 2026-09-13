@@ -71,7 +71,7 @@ export function LoginPage({ onAuthenticated, register = false }: LoginPageProps)
         <form onSubmit={submitLogin}>
           <label><span className="sr-only">Email</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="Email" required autoFocus /></label>
           {step === "password" ? <label><span className="sr-only">Password</span><input type="password" name="password" autoComplete="current-password" placeholder="Password" minLength={12} required autoFocus /></label> : null}
-          <button className="login-submit" type="submit" disabled={busy}>{busy ? "Signing in..." : step === "email" ? "Continue" : "Sign in"}</button>
+          <button className="sr-only" type="submit">Submit</button>
         </form>
         {error ? <p className="login-note" role="alert">{error}</p> : null}
         {step === "password" ? <button className="login-back-step" type="button" onClick={() => setStep("email")}>Use a different email</button> : null}
