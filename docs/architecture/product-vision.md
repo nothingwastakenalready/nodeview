@@ -14,11 +14,11 @@ raffael should answer three questions fast:
 2. what is getting worse?
 3. what is probably causing it?
 
-The primary visual language is a node map built around hexagonal infrastructure nodes, status colors and drill-down telemetry.
+the primary visual language is a node map built around hexagonal infrastructure nodes, status colors and drill-down telemetry.
 
-A node is not just a URL. It can represent a server, VM, container host, appliance, switch, logical system or remote machine.
+a node is not just a url. it can represent a server, vm, container host, appliance, switch, logical system or remote machine.
 
-Services and checks belong to nodes. Measurements and events belong to checks. Dependencies connect nodes and services.
+services and checks belong to nodes. measurements and events belong to checks. dependencies connect nodes and services.
 
 ```text
 workspace
@@ -37,7 +37,7 @@ workspace
 
 ## product surfaces
 
-One backend, multiple clients.
+one backend, multiple clients.
 
 ```text
                        browser
@@ -57,7 +57,7 @@ agent(s) -----> raffael api/core <----- desktop app
                    data
 ```
 
-The desktop app should reuse the same frontend rather than becoming a second product. Tauri is the current preferred packaging direction once the web client is mature.
+the desktop app should reuse the same frontend rather than becoming a second product. tauri is the current preferred packaging direction once the web client is mature.
 
 ## visual identity
 
@@ -72,7 +72,7 @@ The desktop app should reuse the same frontend rather than becoming a second pro
 
 ### node detail
 
-A selected node opens a detail view with:
+a selected node opens a detail view with:
 
 - current state
 - current latency
@@ -81,13 +81,13 @@ A selected node opens a detail view with:
 - current problems
 - recent events
 - latency history
-- later CPU, memory, disk, network and container telemetry
+- later cpu, memory, disk, network and container telemetry
 
 ### dependency view
 
-A graph connects infrastructure relationships so raffael can distinguish multiple symptoms from a shared likely cause.
+a graph connects infrastructure relationships so raffael can distinguish multiple symptoms from a shared likely cause.
 
-Example:
+example:
 
 ```text
 internet
@@ -99,11 +99,11 @@ dns   proxy
 apps   services
 ```
 
-Dependency state must not pretend to prove causality. It indicates affected/downstream relationships and likely root causes.
+dependency state must not pretend to prove causality. It indicates affected/downstream relationships and likely root causes.
 
 ## data model
 
-The application is workspace-first rather than user-id-everywhere.
+the application is workspace-first rather than user-id-everywhere.
 
 ```text
 user
@@ -131,8 +131,8 @@ Every tenant-owned object belongs to exactly one workspace. Authorization happen
 
 ### phase-one active checks
 
-- HTTP / HTTPS
-- TCP
+- http / httpS
+- tcp
 - ICMP
 - DNS
 
@@ -146,28 +146,28 @@ Each check can produce:
 
 Latency is a first-class metric, not display metadata.
 
-Thresholds are check-aware and configurable. A single global `100ms = bad` rule is not useful across LAN and internet targets.
+thresholds are check-aware and configurable. a single global `100ms = bad` rule is not useful across lan and internet targets.
 
 ### later agent telemetry
 
 A small raffael agent can report host-level data such as:
 
-- CPU
+- cpu
 - memory
 - disks/filesystems
 - network throughput
 - uptime/load
 - temperatures where available
 - processes/services
-- Docker/container state
+- docker/container state
 
-The long-term agent should be a small standalone binary with minimal privileges. The exact implementation language stays open until the server protocol is stable.
+the long-term agent should be a small standalone binary with minimal privileges. the exact implementation language stays open until the server protocol is stable.
 
 ### history
 
-Measurements are append-oriented time-series data. The product needs retention/downsampling rules before high-frequency telemetry is enabled.
+measurements are append-oriented time-series data. the product needs retention/downsampling rules before high-frequency telemetry is enabled.
 
-Do not build a full Prometheus replacement. Raffael stores enough history for its own UX and can later expose Prometheus-compatible metrics for users who want deeper external analysis.
+do not build a full Prometheus replacement. raffael stores enough history for its own UX and can later expose Prometheus-compatible metrics for users who want deeper external analysis.
 
 ## security model
 
@@ -195,7 +195,7 @@ security is architecture, not a v1 checkbox.
 
 Monitoring intentionally makes outbound network requests, so target validation is a core security boundary.
 
-Raffael must distinguish deployment modes:
+raffael must distinguish deployment modes:
 
 - trusted self-hosted mode: operator can permit private networks
 - hosted/multi-tenant mode: strict target policy, address resolution checks and network egress controls
@@ -206,12 +206,12 @@ Protection must account for redirects, DNS rebinding, loopback, link-local, meta
 
 - no secrets in repository/config examples
 - encrypted secret storage when integrations require credentials
-- never expose internal targets/secrets through public APIs or logs
+- never expose internal targets/secrets through public apis or logs
 - desktop credentials use operating-system credential storage rather than plain files/localStorage
 
 ### software supply chain
 
-Open-source releases should add:
+open-source releases should add:
 
 - dependency scanning
 - static analysis
@@ -230,15 +230,15 @@ Keep the existing Python core.
 Preferred direction:
 
 - Python 3.11+
-- FastAPI for HTTP API
-- Pydantic models at API/config boundaries
+- fastapi for http api
+- pydantic models at api/config boundaries
 - SQLAlchemy 2.x style persistence
 - Alembic migrations
 - SQLite for easy single-node development/small installs where feasible
 - PostgreSQL as the supported serious multi-user deployment database
 - pytest
 
-Business/monitoring logic must not live inside FastAPI route functions.
+Business/monitoring logic must not live inside fastapi route functions.
 
 ### frontend
 
@@ -247,12 +247,12 @@ Preferred direction:
 - TypeScript
 - React
 - Vite
-- API-generated/shared types where practical
+- api-generated/shared types where practical
 - SVG/CSS for the hex node surface
 - a graph library for dependency topology only after interaction requirements are proven
 - chart library for time-series data
 
-Do not choose a huge dashboard framework just to get charts quickly.
+do not choose a huge dashboard framework just to get charts quickly.
 
 ### desktop
 
@@ -262,7 +262,7 @@ Desktop is not required for the first useful web release.
 
 ### deployment
 
-First-class Docker Compose install.
+first-class docker Compose install.
 
 Later:
 
@@ -354,7 +354,7 @@ avoid:
 A technically competent stranger should eventually be able to:
 
 1. clone or pull raffael
-2. run it with Docker Compose
+2. run it with docker Compose
 3. create an account
 4. create a workspace
 5. add infrastructure

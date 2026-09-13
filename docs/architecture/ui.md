@@ -1,26 +1,26 @@
 # raffael ui direction
 
-This is the current design handoff for the browser interface.
+this is the current design handoff for the browser interface.
 
 ## product posture
 
-Raffael should look like a real internal infrastructure tool, not a landing page and not a generic admin template.
+raffael should look like a real internal infrastructure tool, not a landing page and not a generic admin template.
 
-Raffael is not a Checkmk clone.
+raffael is not a checkmk clone.
 
-Checkmk is only one reference for dense operational scanning and host/service status semantics. The visual language should draw more broadly from monitoring, observability, infrastructure visualizers and modern technical tools.
+checkmk is only one reference for dense operational scanning and host/service status semantics. the visual language should draw more broadly from monitoring, observability, infrastructure visualizers and modern technical tools.
 
-Useful references by category:
+useful references by category:
 
-- Checkmk: dense status scanning, host/service mental model, operational seriousness
-- Uptime Kuma / Gatus: low-friction uptime monitoring, clear service states, simple setup
-- Beszel / Netdata: lightweight host telemetry, calm server-health dashboards, hub + agent direction
-- Grafana / Datadog / New Relic: dashboards, time-series reading, filtering, drill-down, incident context
-- Honeycomb / SigNoz-style observability tools: event-first investigation, high-cardinality exploration, trace-like navigation ideas later
-- Docker and infrastructure visualizers: live topology, container/network relationships, object maps
-- Linear / Vercel / Raycast / modern developer tools: sharp typography, command-oriented polish and low visual noise
+- checkmk: dense status scanning, host/service mental model, operational seriousness
+- uptime kuma / gatus: low-friction uptime monitoring, clear service states, simple setup
+- beszel / netdata: lightweight host telemetry, calm server-health dashboards, hub + agent direction
+- grafana / datadog / new relic: dashboards, time-series reading, filtering, drill-down, incident context
+- honeycomb / signoz-style observability tools: event-first investigation, high-cardinality exploration, trace-like navigation ideas later
+- docker and infrastructure visualizers: live topology, container/network relationships, object maps
+- linear / vercel / raycast / modern developer tools: sharp typography, command-oriented polish and low visual noise
 
-The goal is a distinct Raffael identity: technical, restrained, fast to read, slightly opinionated, and not visually owned by any one existing product.
+the goal is a distinct raffael identity: technical, restrained, fast to read, slightly opinionated, and not visually owned by any one existing product.
 
 ## design principles
 
@@ -34,12 +34,12 @@ The goal is a distinct Raffael identity: technical, restrained, fast to read, sl
 
 ## density model
 
-The interface mixes two densities:
+the interface mixes two densities:
 
 - **overview:** compact and operational, enough objects visible to scan quickly
 - **detail:** more spacious and modern, with room for latency/history and later telemetry
 
-The rule is simple: dense where operators need orientation, quiet where they need analysis.
+the rule is simple: dense where operators need orientation, quiet where they need analysis.
 
 ## hierarchy
 
@@ -47,43 +47,43 @@ The rule is simple: dense where operators need orientation, quiet where they nee
 2. topology / dependency view
 3. node detail
 
-The current implementation only ships the overview plus a lightweight selected-monitor detail panel.
+the current implementation only ships the overview plus a lightweight selected-monitor detail panel.
 
 ## overview
 
-The primary visual motif is a field of hexagonal status tiles for now, but the hexagon is not sacred. It is a current motif, not a prison.
+the primary visual motif is a field of hexagonal status tiles for now, but the hexagon is not sacred. it is a current motif, not a prison.
 
-Each tile currently shows:
+each tile currently shows:
 
 - service name
 - current latency
 - readable status
 - status ring/color
 
-The inside remains quiet. Status lives mostly on the perimeter so a large grid does not become a wall of saturated color.
+the inside remains quiet. status lives mostly on the perimeter so a large grid does not become a wall of saturated color.
 
-Target desktop density is roughly 15–25 useful tiles on a 1440p display once the real node model exists. Do not cram CPU, RAM, uptime, service counts and every secondary metric into the overview tile.
+target desktop density is roughly 15-25 useful tiles on a 1440p display once the real node model exists. do not cram cpu, ram, uptime, service counts and every secondary metric into the overview tile.
 
-If another visual primitive later communicates state better than hexagons, it can replace them. The product requirement is fast state recognition, not geometric loyalty.
+if another visual primitive later communicates state better than hexagons, it can replace them. the product requirement is fast state recognition, not geometric loyalty.
 
 ## status semantics
 
-- healthy — green
-- warning — amber
-- critical — red
-- unknown — grey
-- pending — blue
-- affected — later topology-derived downstream impact, visually distinct from direct critical failure
+- healthy - green
+- warning - amber
+- critical - red
+- unknown - grey
+- pending - blue
+- affected - later topology-derived downstream impact, visually distinct from direct critical failure
 
-Exact color values are not sacred yet. Semantics are.
+exact color values are not sacred yet. semantics are.
 
-Color must not be the only state indicator. Status text/symbols remain visible for accessibility and fast interpretation.
+color must not be the only state indicator. status text/symbols remain visible for accessibility and fast interpretation.
 
 ## detail direction
 
-Detail views should be noticeably calmer than the overview.
+detail views should be noticeably calmer than the overview.
 
-Future node detail is expected to have:
+future node detail is expected to have:
 
 - current health
 - current latency
@@ -91,45 +91,45 @@ Future node detail is expected to have:
 - latency history
 - services/checks
 - events
-- later CPU/RAM/disk/agent telemetry
+- later cpu/ram/disk/agent telemetry
 
-Time-series charts get real space instead of being squeezed into cards for dashboard aesthetics.
+time-series charts get real space instead of being squeezed into cards for dashboard aesthetics.
 
-Charts should be readable before they are pretty. Borrow from Grafana/Datadog/New Relic only at the pattern level: clear axes, useful ranges, good drill-down, obvious correlation. Do not build a generic dashboard-builder clone.
+charts should be readable before they are pretty. borrow from grafana/datadog/new relic only at the pattern level: clear axes, useful ranges, good drill-down, obvious correlation. do not build a generic dashboard-builder clone.
 
 ## topology direction
 
-The later topology screen sits between overview and detail in density.
+the later topology screen sits between overview and detail in density.
 
-It should show real dependencies, not decorative lines. Expected semantics:
+it should show real dependencies, not decorative lines. expected semantics:
 
 - node/service relationships
 - upstream/downstream direction
 - direct failures as `critical`
 - downstream impact as `affected` when appropriate
 
-Never imply proven root cause when the system only knows dependency relationships.
+never imply proven root cause when the system only knows dependency relationships.
 
-Topology should feel more like an infrastructure map than a cyberpunk poster. Lines should explain paths, blast radius and probable impact. Animation is useful only if it reveals freshness or flow.
+topology should feel more like an infrastructure map than a cyberpunk poster. lines should explain paths, blast radius and probable impact. animation is useful only if it reveals freshness or flow.
 
 ## current implementation limitation
 
-As of the first UI shell, the backend has services/checks but does not yet have the final workspace/node/service hierarchy.
+as of the first UI shell, the backend has services/checks but does not yet have the final workspace/node/service hierarchy.
 
-Therefore each service is temporarily rendered as one hexagon.
+therefore each service is temporarily rendered as one hexagon.
 
-Do not build product logic around that shortcut. The intended model remains:
+do not build product logic around that shortcut. the intended model remains:
 
 `user -> membership -> workspace -> nodes -> services -> checks -> measurements/events`
 
-The overview should migrate from service tiles to node tiles once that backend model is introduced.
+the overview should migrate from service tiles to node tiles once that backend model is introduced.
 
 ## visual rules
 
 - light warm-neutral application background; avoid sterile pure white across the whole canvas
 - restrained borders and surfaces
 - dark mode may follow later, but the light system is the current design target
-- avoid copying Checkmk's exact palette, density, iconography or spacing
+- avoid copying checkmk's exact palette, density, iconography or spacing
 - no gratuitous gradients
 - no cyberpunk/neon treatment as the default identity
 - no fake terminal styling
@@ -142,8 +142,8 @@ The overview should migrate from service tiles to node tiles once that backend m
 
 ## current visual direction (2026-09-12)
 
-The first visual pass now follows a dark operations-console direction inspired by
-modular technical dashboards and compact diagnostic widgets. This is a Raffael
+the first visual pass now follows a dark operations-console direction inspired by
+modular technical dashboards and compact diagnostic widgets. this is a raffael
 direction, not a copy of any reference product.
 
 - near-black canvas with a restrained dotted field
@@ -155,7 +155,7 @@ direction, not a copy of any reference product.
 - login uses the same dark system, with a grid field, an orange accent and a
   focused split layout
 
-The overview keeps the existing service state and latency logic. New widgets
+the overview keeps the existing service state and latency logic. new widgets
 derive only from live state: healthy percentage, warning/critical count and the
 selected monitor latency. No illustrative metrics are presented as real data.
 
@@ -186,9 +186,9 @@ Current first-shell stack:
 - Vitest 5
 - plain CSS
 
-No component framework is intentionally used yet. The interface is still small and the design language is expected to evolve in Codex.
+no component framework is intentionally used yet. the interface is still small and the design language is expected to evolve in codex.
 
-The production build is served from the same FastAPI process as the API. Development can use Vite with API proxying.
+the production build is served from the same fastapi process as the api. development can use vite with api proxying.
 
 ## what to improve in Codex next
 
@@ -200,6 +200,6 @@ Design iteration can change spacing, typography, exact colors, hexagon geometry,
 - detail is calmer than overview
 - no fake metrics are introduced
 - current service-as-tile representation is understood as temporary
-- the result feels like Raffael, not Checkmk wearing different CSS
+- the result feels like raffael, not checkmk wearing different CSS
 
 Before adding topology or historical charts, wait until the corresponding backend data is real.

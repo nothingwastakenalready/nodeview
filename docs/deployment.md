@@ -1,18 +1,18 @@
-# Deployment checklist
+# deployment checklist
 
-Raffael uses a SQLite database in the Docker volume, so every production deploy
+raffael uses a sqlite database in the docker volume, so every production deploy
 with migrations must start with a backup and end with a health check.
 
-## Local pre-deploy check
+## local pre-deploy check
 
-Run this from the repository before pushing or deploying:
+run this from the repository before pushing or deploying:
 
 ```bash
 scripts/pre-deploy-check.sh
 ```
 
-This runs the Python tests, frontend tests, frontend build, and validates the
-Docker Compose file. The Python suite includes Alembic tests for:
+this runs the python tests, frontend tests, frontend build, and validates the
+docker compose file. the python suite includes alembic tests for:
 
 - a fresh SQLite database upgraded to the current head
 - a database where `devices.parent_id` and `ix_devices_parent_id` already exist
@@ -20,17 +20,17 @@ Docker Compose file. The Python suite includes Alembic tests for:
 - monitoring sensor migrations through `20260913_02`, including stored sensor
   details for current state and history rows
 
-## Production deploy order
+## production deploy order
 
-Use this order on the VM from `/opt/raffael`.
+use this order on the vm from `/opt/raffael`.
 
-1. Stop only the app container before touching the database:
+1. stop only the app container before touching the database:
 
    ```bash
    docker compose stop raffael
    ```
 
-2. Create a timestamped database backup:
+2. create a timestamped database backup:
 
    ```bash
    mkdir -p backups
@@ -41,7 +41,7 @@ Use this order on the VM from `/opt/raffael`.
      sh -c 'cp /data/raffael.db /backup/raffael-before-deploy-$(date +%Y%m%d-%H%M%S).db'
    ```
 
-3. Inspect the live schema before running migrations:
+3. inspect the live schema before running migrations:
 
    ```bash
    docker compose run --rm --no-deps raffael python - <<'PY'
@@ -61,7 +61,7 @@ Use this order on the VM from `/opt/raffael`.
    PY
    ```
 
-4. Pull/build the intended release and run migrations:
+4. pull/build the intended release and run migrations:
 
    ```bash
    git pull --ff-only
@@ -70,7 +70,7 @@ Use this order on the VM from `/opt/raffael`.
    docker compose run --rm --no-deps raffael alembic upgrade head
    ```
 
-5. Start the app and verify it:
+5. start the app and verify it:
 
    ```bash
    docker compose up -d raffael
@@ -78,22 +78,22 @@ Use this order on the VM from `/opt/raffael`.
    curl -fsS http://127.0.0.1:8080/health
    ```
 
-6. Check the public page from another machine:
+6. check the public page from another machine:
 
    ```bash
    curl -fsS http://192.168.1.147:8080/health
    ```
 
-## Rollback triggers
+## rollback triggers
 
-Rollback or stop the deploy if any of these happen:
+rollback or stop the deploy if any of these happen:
 
 - the backup cannot be created or read
 - `PRAGMA integrity_check` is not `ok`
-- Alembic fails during migration
+- alembic fails during migration
 - the app container repeatedly restarts
-- `/health` does not return HTTP 200 after startup
+- `/health` does not return http 200 after startup
 
-For a failed deploy, keep the app stopped, preserve the failed database for
+for a failed deploy, keep the app stopped, preserve the failed database for
 inspection, and restore from the timestamped backup only after confirming the
 backup passes `PRAGMA integrity_check`.

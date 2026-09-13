@@ -19,7 +19,7 @@ RAFFAEL_PUBLIC_URL=http://127.0.0.1:8080
 
 `RAFFAEL_BIND_ADDRESS` controls where the app is published.
 
-`RAFFAEL_MAILPIT_BIND_ADDRESS` controls where the local Mailpit inbox is
+`RAFFAEL_MAILPIT_BIND_ADDRESS` controls where the local mailpit inbox is
 published.
 
 `RAFFAEL_PUBLIC_URL` is used for links in emails, especially password reset

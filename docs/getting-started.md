@@ -74,7 +74,7 @@ port: 80
 use addresses from your own network. raffael is intentionally conservative about
 what targets it will check.
 
-## make it visible in your LAN
+## make it visible in your lan
 
 for normal testing, keep the default localhost config.
 
@@ -124,10 +124,10 @@ only run that if you really want a fresh install.
 ## what works today
 
 - local account login
-- password reset through Mailpit
+- password reset through mailpit
 - http checks
 - tcp checks
-- automatic TCP port discovery checks created from known devices
+- automatic tcp port discovery checks created from known devices
 - current status
 - latency
 - uptime and downtime percentages from history
@@ -137,10 +137,10 @@ only run that if you really want a fresh install.
 ## what is not there yet
 
 - full Zabbix or Checkmk feature depth
-- native Proxmox metrics
-- native UniFi metrics
+- native proxmox metrics
+- native unifi metrics
 - SNMP polling
-- Docker container monitoring
+- docker container monitoring
 - icmp ping as a first-class check
 - alerting
 - public internet deployment guidance

@@ -1,22 +1,22 @@
-# Monitoring sensors
+# monitoring sensors
 
-Raffael keeps the sky interface, but the data model underneath is now closer to
-Checkmk, Zabbix and Grafana-style monitoring:
+raffael keeps the sky interface, but the data model underneath is now closer to
+checkmk, zabbix and grafana-style monitoring:
 
 - one star represents one device
 - one device can own many sensors
-- a sensor is an executable check, for example HTTP, TCP or automatic TCP probe
+- a sensor is an executable check, for example http, tcp or automatic tcp probe
 - the star shows the worst current sensor state for that device
 - the selected device panel shows the sensors below that star
 
-## Current sensor data
+## current sensor data
 
-Every persisted sensor state can expose:
+every persisted sensor state can expose:
 
 - current status
 - current latency
 - last check time
-- HTTP status, where relevant
+- http status, where relevant
 - success and failure streaks
 - uptime percentage from recent samples
 - downtime percentage from recent samples
@@ -24,28 +24,28 @@ Every persisted sensor state can expose:
 - down-event count from recent samples
 - technical details such as target, host, port and automatic probe result
 
-The history table stores the same technical details so a restart does not erase
+the history table stores the same technical details so a restart does not erase
 the monitoring evidence.
 
-## Current sensor types
+## current sensor types
 
-- `http` checks one HTTP or HTTPS URL.
+- `http` checks one http or https url.
 - `tcp` checks one host and port.
-- `tcp_auto` checks a device host against known LAN service ports and records the
+- `tcp_auto` checks a device host against known lan service ports and records the
   first responding port.
 
-These are real reachability and latency checks. They are not placeholders.
+these are real reachability and latency checks. they are not placeholders.
 
-## Next sensor types
+## next sensor types
 
-The next production-grade monitoring work should add connector-backed sensors:
+the next production-grade monitoring work should add connector-backed sensors:
 
-- SNMP for generic network and host metrics
-- Proxmox for node, VM, LXC, storage and backup state
-- UniFi for clients, APs, switches, ports and controller health
-- Docker for container state
-- TLS certificate expiry for HTTPS targets
-- DNS checks for local resolver health
+- snmp for generic network and host metrics
+- proxmox for node, vm, lxc, storage and backup state
+- unifi for clients, aps, switches, ports and controller health
+- docker for container state
+- tls certificate expiry for https targets
+- dns checks for local resolver health
 
-The design goal is unchanged: the sky stays calm and visual, while the selected
+the design goal is unchanged: the sky stays calm and visual, while the selected
 device view carries the serious operational data underneath.

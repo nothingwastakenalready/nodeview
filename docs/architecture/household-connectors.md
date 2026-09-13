@@ -1,19 +1,19 @@
 # household connectors
 
-Raffael treats a household as the user's current workspace. Devices are owned
+raffael treats a household as the user's current workspace. devices are owned
 by that workspace and are represented through a connector rather than through
-one universal device API.
+one universal device api.
 
 ## connector boundary
 
-The initial catalog contains:
+the initial catalog contains:
 
-- `unifi` — local UniFi Network API
-- `hue` — Philips Hue Bridge API
-- `proxmox` — Proxmox REST API
-- `windows-agent` — local Windows telemetry agent
-- `macos-agent` — local macOS telemetry agent
-- `generic` — HTTP/TCP health checks
+- `unifi` - local unifi network api
+- `hue` - philips hue bridge api
+- `proxmox` - proxmox rest api
+- `windows-agent` - local windows telemetry agent
+- `macos-agent` - local macos telemetry agent
+- `generic` - http/tcp health checks
 
 `GET /integrations/catalog` exposes this catalog to the UI. `GET
 /household/devices` lists devices in the current workspace. `POST
@@ -21,14 +21,14 @@ The initial catalog contains:
 
 ## client import sources
 
-Raffael must not depend on one vendor. UniFi is only one adapter behind a
+raffael must not depend on one vendor. unifi is only one adapter behind a
 shared source contract:
 
 ```text
 source -> normalized client -> workspace device
 ```
 
-All import sources return the same normalized client fields:
+all import sources return the same normalized client fields:
 
 - `name`
 - `endpoint`
@@ -37,17 +37,17 @@ All import sources return the same normalized client fields:
 - `metadata`
 
 `POST /integrations/{source}/clients/import` imports clients from a configured
-source and upserts them by MAC address or endpoint. This keeps repeated imports
+source and upserts them by mac address or endpoint. this keeps repeated imports
 safe and avoids duplicate clients.
 
-Current source adapters:
+current source adapters:
 
-- `unifi` reads clients from a UniFi Network API.
+- `unifi` reads clients from a unifi network api.
 - `api` reads clients from a generic JSON endpoint.
-- `snmp` reads a configured target list and imports reachable SNMP devices as
-  clients for the first SNMP slice.
+- `snmp` reads a configured target list and imports reachable snmp devices as
+  clients for the first snmp slice.
 
-Current Docker configuration:
+current docker configuration:
 
 - `RAFFAEL_UNIFI_URL`, for example `https://192.168.1.1`
 - `RAFFAEL_UNIFI_USERNAME`
@@ -60,23 +60,23 @@ Current Docker configuration:
 - `RAFFAEL_SNMP_COMMUNITY`, default `public`
 - `RAFFAEL_SNMP_PORT`, default `161`
 
-The current slice stores connector metadata and a credential reference only.
-It must never store passwords, API tokens or private keys in `metadata_json` or
-in API responses. Credential resolution belongs to a later connector runtime
-using an OS keychain, environment-backed secret store or another explicitly
+the current slice stores connector metadata and a credential reference only.
+it must never store passwords, api tokens or private keys in `metadata_json` or
+in api responses. credential resolution belongs to a later connector runtime
+using an os keychain, environment-backed secret store or another explicitly
 configured local secret provider.
 
 ## discovery direction
 
-Discovery is intentionally separate from persistence:
+discovery is intentionally separate from persistence:
 
-1. a local connector discovers candidates on the LAN;
+1. a local connector discovers candidates on the lan;
 2. the user reviews and selects candidates;
-3. Raffael persists the selected device in the workspace;
+3. raffael persists the selected device in the workspace;
 4. the connector reports normalized health and telemetry;
 5. topology derives relationships from observed dependencies.
 
-The server must not blindly scan or enroll every device. Enrollment requires an
+the server must not blindly scan or enroll every device. enrollment requires an
 explicit user action and least-privilege credentials. Agents should use an
 outbound authenticated connection and must not provide arbitrary remote command
 execution.

@@ -21,7 +21,7 @@ there are obviously a hundred tools that do this already. i didn't want any of t
 - failure/recovery thresholds so one bad sample does not immediately become the apocalypse
 - browser ui with a starfield/constellation overview
 - docker because leaving a terminal open forever is stupid
-- local Mailpit inbox for safe email development
+- local mailpit inbox for safe email development
 
 ## if you found this
 
@@ -132,7 +132,7 @@ monitoring fields are optional. defaults are 30s interval, two failures before c
 
 ## ui dev
 
-The first UI is deliberately small and easy to change. Run the API on `127.0.0.1:8080`, then:
+the ui is deliberately small and easy to change. run the api on `127.0.0.1:8080`, then:
 
 ```bash
 cd web
@@ -140,9 +140,9 @@ npm install
 npm run dev
 ```
 
-Vite proxies the Raffael API during development. The production Docker image builds the frontend and serves it from FastAPI, so there is no second service to operate.
+vite proxies the raffael api during development. the production docker image builds the frontend and serves it from fastapi, so there is no second service to operate.
 
-The current screen uses services as overview tiles because the real node/workspace model does not exist yet. That is temporary and documented in `docs/architecture/ui.md`.
+the current screen uses services as overview tiles because the real node/workspace model does not exist yet. that is temporary and documented in `docs/architecture/ui.md`.
 
 ## where this is going
 
@@ -156,10 +156,10 @@ v0.4 has started with durable measurement history. retention, uptime aggregation
 
 see `docs/architecture/product-vision.md`, `docs/architecture/roadmap.md` and `docs/architecture/ui.md` for the longer version.
 
-The reproducible Proxmox/Mini-PC hierarchy test is documented in
+the reproducible proxmox/mini-pc hierarchy test is documented in
 `docs/architecture/proxmox-minipc-test.md`.
 
-The monitoring data model is documented in
+the monitoring data model is documented in
 `docs/architecture/monitoring-sensors.md`: one star remains one device, while
 multiple executable sensors can run underneath it.
 

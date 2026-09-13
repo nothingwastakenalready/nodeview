@@ -1,76 +1,73 @@
-# Proxmox- und Mini-PC-Testaufbau
+# proxmox and mini-pc test shape
 
-Dieses Dokument beschreibt den kleinsten reproduzierbaren Testaufbau für eine
-hierarchische Überwachung. Er funktioniert unabhängig von UniFi und verwendet
-nur die vorhandenen Geräte- und Connector-Endpunkte.
+this is the smallest repeatable topology test for hierarchical monitoring.
+it does not need unifi and only uses the existing device and connector
+endpoints.
 
-## Zielbild
+## target shape
 
 ```text
-Proxmox (proxmox / REST API)
-└── Raffael-VM 105 (icmp oder ssh)
-    └── Raffael-Web (generic / HTTP :8080)
+proxmox (proxmox / rest api)
+└── raffael-vm 105 (icmp or ssh)
+    └── raffael-web (generic / http :8080)
 
-Mini-PC (icmp oder ssh)
-└── Docker (docker API)
-    └── Home Assistant (generic / HTTP)
+mini-pc (icmp or ssh)
+└── docker (docker api)
+    └── home assistant (generic / http)
 ```
 
-Proxmox wird nur einmal verbunden. Der Connector kann anschließend Nodes,
-VMs und Container als Kinder anlegen. Einzelne Betriebssystemprozesse werden
-nicht automatisch als eigene Geräte angelegt; überwacht werden stattdessen
-relevante Dienste. Eine Prozessprüfung per SSH oder Agent bleibt eine optionale
-Vertiefung.
+proxmox is connected once. later, the connector can create nodes, vms and
+containers below it. operating-system processes are not automatically modeled as
+devices; relevant services are monitored instead. process checks through ssh or
+an agent stay a deeper follow-up.
 
-## Einrichtung über die Website/API
+## setup through ui/api
 
-1. Unter **Geräte → Gerät hinzufügen** ein Infrastrukturgerät `Proxmox`
-   anlegen, zum Beispiel mit `https://192.168.1.20:8006`.
-2. Die Zugangsdaten als geheime Credential-Referenz hinterlegen. Passwörter
-   und Tokens gehören nicht in die Geräte-Metadaten.
-3. Die erkannte VM oder den Container unter dem Proxmox-Gerät anlegen. Als
-   einfachen ersten Check `icmp` verwenden; für Dienstmetriken `ssh`.
-4. Den Raffael-Webdienst als Kind der VM mit `generic` und
-   `http://192.168.1.147:8080/health` eintragen.
-5. Den Mini-PC als eigenes Gerät mit `icmp` oder `ssh` anlegen.
-6. Darunter den Docker-Connector und die gewünschten HTTP/TCP-Dienste als
-   Kinder anlegen.
+1. create an infrastructure device named `proxmox`, for example
+   `https://192.168.1.20:8006`.
+2. store credentials as a secret reference. passwords and tokens do not belong
+   in device metadata.
+3. create the discovered vm or container below the proxmox device. use `icmp`
+   as the first simple check, or `ssh` later for host metrics.
+4. add the raffael web service below the vm with `generic` and
+   `http://192.168.1.147:8080/health`.
+5. add the mini-pc as its own device with `icmp` or `ssh`.
+6. add docker and the relevant http/tcp services below it.
 
-Die gleichen Schritte lassen sich zum Testen mit der API ausführen:
+the same shape can be created through the api:
 
 ```bash
-# nach Registrierung: CSRF-Token aus dem Browser-Cookie verwenden
+# after registration: use the csrf token from the browser cookie
 curl -X POST http://127.0.0.1:8080/household/devices \
   -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
-  -d '{"connector":"proxmox","name":"Proxmox","endpoint":"https://192.168.1.20:8006","credential_ref":"keychain://raffael/proxmox"}'
+  -d '{"connector":"proxmox","name":"proxmox","endpoint":"https://192.168.1.20:8006","credential_ref":"keychain://raffael/proxmox"}'
 
-# die zurückgegebene id als parent_id verwenden
+# use the returned id as parent_id
 curl -X POST http://127.0.0.1:8080/household/devices \
   -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
-  -d '{"connector":"generic","name":"Raffael-Web","endpoint":"http://192.168.1.147:8080/health","parent_id":1,"metadata":{"role":"service"}}'
+  -d '{"connector":"generic","name":"raffael-web","endpoint":"http://192.168.1.147:8080/health","parent_id":1,"metadata":{"role":"service"}}'
 ```
 
-## Erwartetes Verhalten
+## expected behavior
 
-- Ein nicht erreichbarer Proxmox-Host markiert seine Kinder als nicht
-  erreichbar, ohne für jeden Dienst einen separaten Netzwerkfehler zu melden.
-- Ist nur ein Dienst defekt, bleibt der Host grün und ausschließlich der Dienst
-  wird kritisch.
-- Ein Mini-PC kann ohne UniFi überwacht werden: ICMP reicht für Erreichbarkeit;
-  SSH/SNMP oder ein späterer Agent liefern Ressourcen und Dienstmetriken.
-- Clients werden mit `POST /household/clients` angelegt und erhalten über
-  `parent_id` denselben Abhängigkeitsbaum.
+- if the proxmox host is unreachable, its children can be marked affected
+  without turning every service into a separate mystery.
+- if only one service is broken, the host stays healthy and the service is the
+  thing that goes critical.
+- the mini-pc can be monitored without unifi. icmp is enough for reachability;
+  ssh, snmp or a later agent can add resource and service metrics.
+- clients created with `POST /household/clients` can use `parent_id` to join
+  the same dependency tree.
 
-## Automatisierter Test
+## automated test
 
-`tests/test_topology.py` erstellt diesen Aufbau in einer frischen SQLite-
-Datenbank und prüft die Eltern-Kind-Beziehungen. Er benötigt keine echte
-Proxmox-, Docker- oder Mini-PC-Verbindung und ist daher für CI geeignet:
+`tests/test_topology.py` builds this shape in a fresh sqlite database and checks
+the parent/child relationships. it does not need a real proxmox, docker or
+mini-pc connection:
 
 ```bash
 pytest tests/test_topology.py
 ```
 
-Der Test ist ein Vertrag für die spätere Connector-Laufzeit: Discovery darf
-weitere Kinder hinzufügen, aber die einfache manuelle Einrichtung muss stabil
-bleiben.
+the test is a contract for the later connector runtime. discovery may add more
+children, but the simple manual setup must stay stable.

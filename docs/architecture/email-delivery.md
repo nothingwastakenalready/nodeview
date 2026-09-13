@@ -2,23 +2,23 @@
 
 ## status
 
-Local development delivery is documented and wired through Mailpit. Account
+local development delivery is documented and wired through mailpit. account
 verification and newsletter double opt-in are wired to the auth store and mail
-boundary. Newsletter unsubscribe persistence remains the next application
+boundary. newsletter unsubscribe persistence remains the next application
 slice.
 
 ## environments
 
 ### local development
 
-Compose starts Mailpit next to Raffael:
+compose starts mailpit next to raffael:
 
 ```text
 smtp inside docker: mailpit:1025
 inbox: http://127.0.0.1:8025
 ```
 
-Mailpit accepts messages without delivering them to real recipients. This keeps
+mailpit accepts messages without delivering them to real recipients. this keeps
 registration tests and UI work safe without a domain or external credentials.
 
 for lan access, set `RAFFAEL_MAILPIT_BIND_ADDRESS` in `.env` to the docker host's
@@ -32,8 +32,8 @@ RAFFAEL_PUBLIC_URL=http://192.168.1.50:8080
 
 ### production
 
-Proton SMTP Submission is the intended first production adapter when a paid
-Proton plan and custom domain are available:
+proton smtp submission is the intended first production adapter when a paid
+proton plan and custom domain are available:
 
 ```env
 RAFFAEL_MAIL_PROVIDER=smtp
@@ -46,13 +46,13 @@ RAFFAEL_MAIL_FROM=notifications@example.org
 RAFFAEL_PUBLIC_URL=https://monitor.example.org
 ```
 
-`RAFFAEL_SMTP_PASSWORD` is a Proton SMTP token, not the Proton account
-password. It belongs in a secret store or an untracked environment file and
+`RAFFAEL_SMTP_PASSWORD` is a proton smtp token, not the proton account
+password. it belongs in a secret store or an untracked environment file and
 must never be committed.
 
 ## message flows
 
-Registration confirmation and newsletter subscription are separate flows:
+registration confirmation and newsletter subscription are separate flows:
 
 1. registration creates an unverified account;
 2. a short-lived, single-use confirmation token is sent;
@@ -61,22 +61,22 @@ Registration confirmation and newsletter subscription are separate flows:
 5. newsletter double opt-in creates a separate subscription record;
 6. every newsletter contains an immediate unsubscribe link.
 
-An account must not be subscribed to the newsletter merely because it was
-created. Consent text, timestamp and subscription state must be retained for
+an account must not be subscribed to the newsletter merely because it was
+created. consent text, timestamp and subscription state must be retained for
 the consent record.
 
 ## message design
 
-Transactional messages share a deliberately minimal black canvas: the centered
-Raffael mark, one lowercase heading and one underlined action. The logo is
-served as a transparent PNG because SVG images are not rendered consistently
-by email clients. Recipient addresses and account details are intentionally
-omitted from the HTML body. Until the public product descriptor is settled,
+transactional messages share a deliberately minimal black canvas: the centered
+raffael mark, one lowercase heading and one underlined action. the logo is
+served as a transparent png because svg images are not rendered consistently
+by email clients. recipient addresses and account details are intentionally
+omitted from the html body. until the public product descriptor is settled,
 the templates do not append a tagline or infrastructure label.
 
 ## local verification flow
 
-When `RAFFAEL_MAIL_PROVIDER=mailpit`, registration sends the confirmation
-message to Mailpit instead of a real recipient. Open the message in the local
-inbox and follow the confirmation link. The account token is single-use and
-expires after 24 hours. Newsletter confirmation tokens expire after 48 hours.
+when `RAFFAEL_MAIL_PROVIDER=mailpit`, registration sends the confirmation
+message to mailpit instead of a real recipient. open the message in the local
+inbox and follow the confirmation link. the account token is single-use and
+expires after 24 hours. newsletter confirmation tokens expire after 48 hours.

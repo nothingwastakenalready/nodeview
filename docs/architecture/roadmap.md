@@ -2,59 +2,59 @@
 
 this is the product roadmap, not a promise to ship all of it quickly.
 
-Each phase should leave raffael in a working state. Detailed implementation plans live separately under `docs/superpowers/plans/` immediately before execution.
+each phase should leave raffael in a working state. detailed implementation plans live separately under `docs/superpowers/plans/` immediately before execution.
 
-## stream 0 — project foundations
+## stream 0 - project foundations
 
-Goal: make future changes cheap and reviewable.
+goal: make future changes cheap and reviewable.
 
-Deliverables:
+deliverables:
 
-- keep HTTP/TCP core behavior stable
+- keep http/tcp core behavior stable
 - shared check dispatcher
 - package boundaries for monitoring/core/api later
-- CI on supported Python versions
-- Docker image build in CI
-- architecture docs / ADRs for decisions that become hard to reverse
+- ci on supported python versions
+- docker image build in ci
+- architecture docs / adrs for decisions that become hard to reverse
 - security policy before accepting meaningful outside use
 
-Exit criteria:
+exit criteria:
 
 - tests green
 - one documented runtime path
-- no duplicate CLI/API monitoring logic
+- no duplicate cli/api monitoring logic
 
-## stream 1 — always-on server (v0.2)
+## stream 1 - always-on server (v0.2)
 
-Goal: turn the CLI tool into a service.
+goal: turn the cli tool into a service.
 
-Scope:
+scope:
 
-- FastAPI application
+- fastapi application
 - `GET /health`
 - `GET /services`
 - `POST /check`
-- shared dispatcher for HTTP/TCP
-- Dockerfile
+- shared dispatcher for http/tcp
+- dockerfile
 - `compose.yaml`
-- API tests
-- Docker build CI
+- api tests
+- docker build ci
 
-Explicitly still private/trusted-network only.
+explicitly still private/trusted-network only.
 
-Exit criteria:
+exit criteria:
 
-- `docker compose up -d` produces a working API
-- HTTP/TCP checks behave identically from CLI and API
-- CI verifies Python and image build
+- `docker compose up -d` produces a working api
+- http/tcp checks behave identically from cli and api
+- ci verifies python and image build
 
-## stream 2 — monitoring engine + scheduler (v0.3)
+## stream 2 - monitoring engine + scheduler (v0.3)
 
-Goal: checks run continuously without a user request.
+goal: checks run continuously without a user request.
 
-Scope:
+scope:
 
-- check IDs and persistent configuration model
+- check ids and persistent configuration model
 - scheduler with bounded concurrency
 - intervals and timeouts
 - current-state cache/model
@@ -63,52 +63,52 @@ Scope:
 - structured error categories
 - graceful startup/shutdown
 
-Do not add a UI before the engine can produce trustworthy state.
+do not add a ui before the engine can produce trustworthy state.
 
-Exit criteria:
+exit criteria:
 
 - configured checks execute on schedule
 - state transitions are deterministic and tested
 - restart behavior is defined
 
-## stream 3 — persistence + history (v0.4)
+## stream 3 - persistence + history (v0.4)
 
-Goal: answer `what changed?` rather than only `what is true right now?`.
+goal: answer `what changed?` rather than only `what is true right now?`.
 
-Progress: the first v0.4 slice now stores scheduled measurements in SQLite through SQLAlchemy, ships an initial Alembic migration and exposes bounded UTC time-range history. State-change events, retention and uptime calculation remain.
+progress: the first v0.4 slice now stores scheduled measurements in sqlite through sqlalchemy, ships an initial alembic migration and exposes bounded utc time-range history. State-change events, retention and uptime calculation remain.
 
-Scope:
+scope:
 
-- SQLAlchemy persistence layer
-- Alembic migrations
-- initial SQLite development/small-install path
-- PostgreSQL production/multi-user path
+- sqlalchemy persistence layer
+- alembic migrations
+- initial sqlite development/small-install path
+- postgresql production/multi-user path
 - measurements
 - state-change events
 - retention policy
 - latency history
 - uptime calculation
-- API endpoints for history
+- api endpoints for history
 
-Important design work:
+important design work:
 
 - separate current state from measurement history
 - avoid unbounded database growth
-- define timestamp/timezone policy (UTC internally)
+- define timestamp/timezone policy (utc internally)
 
-Exit criteria:
+exit criteria:
 
 - restart preserves configuration/history
 - migrations work from a clean database and previous schema
 - latency/uptime can be queried for a time range
 
-## stream 4 — first real web product (v0.5)
+## stream 4 - first real web product (v0.5)
 
-Goal: raffael becomes usable without editing YAML or reading JSON.
+goal: raffael becomes usable without editing yaml or reading json.
 
-Scope:
+scope:
 
-- TypeScript/React/Vite frontend
+- typescript/react/vite frontend
 - application shell/navigation
 - nodes list
 - services/checks list
@@ -121,15 +121,15 @@ Scope:
 
 Hexagons start here only after basic information architecture works.
 
-Exit criteria:
+exit criteria:
 
-- normal monitoring setup is possible through UI
+- normal monitoring setup is possible through ui
 - no config file required for common use
 - current state and history visible
 
-## stream 5 — accounts + workspaces + tenant isolation (v0.6)
+## stream 5 - accounts + workspaces + tenant isolation (v0.6)
 
-Goal: multiple people can use one raffael instance safely.
+goal: multiple people can use one raffael instance safely.
 
 Data model:
 
@@ -139,7 +139,7 @@ Data model:
 - roles
 - workspace-owned nodes/services/checks/history
 
-Scope:
+scope:
 
 - registration/login/logout
 - Argon2id password hashing
@@ -157,17 +157,17 @@ Security gate:
 
 No internet-facing deployment recommendation until this stream has a dedicated security review.
 
-Exit criteria:
+exit criteria:
 
 - two workspaces cannot read/change each other's data
 - privileged operations are role-gated
 - auth lifecycle is tested
 
-## stream 6 — the raffael visual identity (v0.7)
+## stream 6 - the raffael visual identity (v0.7)
 
-Goal: the interface stops looking like another CRUD monitoring dashboard.
+goal: the interface stops looking like another CRUD monitoring dashboard.
 
-Scope:
+scope:
 
 - hexagonal node overview
 - node status spectrum
@@ -185,21 +185,21 @@ Rules:
 - do not copy Checkmk geometry/layout one-to-one
 - unknown/pending must not look healthy
 
-Exit criteria:
+exit criteria:
 
 - a problem node can be located visually within seconds
 - interface remains useful with dozens of nodes
 - status remains understandable without color alone
 
-## stream 7 — topology + dependency graph (v0.8)
+## stream 7 - topology + dependency graph (v0.8)
 
-Goal: answer `what else is affected?`.
+goal: answer `what else is affected?`.
 
-Scope:
+scope:
 
 - explicit dependency data model
 - node/service dependency edges
-- topology API
+- topology api
 - interactive dependency graph
 - downstream affected state
 - root-cause candidate heuristic
@@ -207,17 +207,17 @@ Scope:
 
 Important rule:
 
-Raffael may suggest likely upstream causes but must not claim causal certainty from topology alone.
+raffael may suggest likely upstream causes but must not claim causal certainty from topology alone.
 
-Exit criteria:
+exit criteria:
 
 - users can model dependencies
 - failures propagate as `affected` without overwriting the actual check state
 - graph remains navigable on realistic small/medium homelabs
 
-## stream 8 — raffael agent (v0.9)
+## stream 8 - raffael agent (v0.9)
 
-Goal: go beyond outside-in reachability checks.
+goal: go beyond outside-in reachability checks.
 
 Protocol first, agent implementation second.
 
@@ -228,7 +228,7 @@ Server scope:
 - authenticated transport
 - revocation
 - heartbeat
-- ingestion API/protocol
+- ingestion api/protocol
 - capability/version negotiation
 
 Agent metrics initially:
@@ -242,7 +242,7 @@ Agent metrics initially:
 
 Then:
 
-- Docker/container stats
+- docker/container stats
 - temperatures/sensors where portable
 - service/process checks
 
@@ -253,16 +253,16 @@ Security:
 - explicit capability model
 - rotation/revocation of enrollment credentials
 
-Exit criteria:
+exit criteria:
 
 - Linux host can enroll and report metrics securely
 - agent loss is visible distinctly from monitored-service failure
 
-## stream 9 — alerting + operations (v0.10)
+## stream 9 - alerting + operations (v0.10)
 
-Goal: raffael becomes useful when nobody is staring at it.
+goal: raffael becomes useful when nobody is staring at it.
 
-Scope:
+scope:
 
 - alert rules
 - recovery notifications
@@ -275,23 +275,23 @@ Scope:
 - email later
 - optional common chat integrations
 
-Exit criteria:
+exit criteria:
 
 - transient failures do not create alert storms
 - maintenance can silence expected events
 - resolved state is communicated
 
-## stream 10 — observability interoperability (v0.11)
+## stream 10 - observability interoperability (v0.11)
 
-Goal: fit into existing infrastructure rather than replacing every tool.
+goal: fit into existing infrastructure rather than replacing every tool.
 
-Scope:
+scope:
 
-- Prometheus-compatible `/metrics`
+- prometheus-compatible `/metrics`
 - documented labels/naming
-- API tokens/service accounts
+- api tokens/service accounts
 - import/export configuration
-- webhooks/events API
+- webhooks/events api
 - optional OpenTelemetry exploration after core metrics are stable
 
 Non-goal:
@@ -299,14 +299,14 @@ Non-goal:
 - PromQL clone
 - Grafana clone
 
-Exit criteria:
+exit criteria:
 
-- Prometheus can scrape Raffael itself and monitor/check metrics
+- prometheus can scrape raffael itself and monitor/check metrics
 - third-party tools can consume stable documented data
 
-## stream 11 — desktop application (v0.12)
+## stream 11 - desktop application (v0.12)
 
-Goal: package the mature web experience as a native desktop client.
+goal: package the mature web experience as a native desktop client.
 
 Preferred direction:
 
@@ -315,26 +315,26 @@ Preferred direction:
 - explicit capability/permission configuration
 - OS credential/keychain storage for long-lived credentials
 - signed builds
-- updater only after release signing and CI are mature
+- updater only after release signing and ci are mature
 
 Possible connection modes:
 
-1. connect to an existing Raffael server
+1. connect to an existing raffael server
 2. later evaluate bundled local server for a single-machine experience
 
 Start with mode 1. Bundling backend/database creates a separate lifecycle problem and is not necessary initially.
 
-Exit criteria:
+exit criteria:
 
 - Windows/macOS/Linux client can authenticate to a server
 - secrets are not stored in browser localStorage/plain files
 - update path is signed/documented
 
-## stream 12 — open-source release quality (1.0 candidate)
+## stream 12 - open-source release quality (1.0 candidate)
 
-Goal: a stranger can safely install, understand and contribute to raffael.
+goal: a stranger can safely install, understand and contribute to raffael.
 
-Scope:
+scope:
 
 - choose/confirm license
 - installation docs
@@ -355,18 +355,18 @@ Scope:
 - tagged releases + changelog
 - sample configs without private addresses/secrets
 
-Exit criteria:
+exit criteria:
 
 - clean install works from docs
 - upgrade path is tested
 - security reporting path exists
-- CI/release artifacts are repeatable
+- ci/release artifacts are repeatable
 
 # parallel workstreams
 
 Some work does not map cleanly to versions and runs continuously.
 
-## A — security
+## a - security
 
 Threat model updated whenever trust boundaries change.
 
@@ -380,7 +380,7 @@ Focus areas:
 - dependency/supply-chain security
 - logging without leaking sensitive infrastructure
 
-## B — UX/design
+## b - ux/design
 
 Maintain a small design language instead of ad-hoc components.
 
@@ -393,28 +393,28 @@ Focus:
 - topology interaction
 - accessibility
 
-## C — quality
+## c - quality
 
 - TDD for behavioral changes
-- integration tests around API/database
+- integration tests around api/database
 - migration tests
 - security regression tests
-- UI tests for critical flows
+- ui tests for critical flows
 - release smoke tests
 
-## D — documentation/open source
+## d - documentation/open source
 
 Docs evolve with features rather than being written at the end.
 
 # working method
 
-For each stream:
+for each stream:
 
 1. write/approve a focused design spec
 2. write a detailed implementation plan
 3. implement test-first
 4. run local verification
-5. run CI
+5. run ci
 6. review security impact
 7. update docs
 8. cut a version only when the slice is actually coherent
@@ -423,12 +423,12 @@ No giant rewrite. Every stream grows the existing working product.
 
 # immediate sequence
 
-The next implementation sequence is:
+the next implementation sequence is:
 
-1. finish v0.2 API + Docker as already designed
+1. finish v0.2 api + docker as already designed
 2. scheduler/state model
 3. persistence/history
-4. first web UI
+4. first web ui
 5. accounts/workspaces
 6. hexagon node view
 7. dependency graph
