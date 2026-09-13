@@ -587,10 +587,10 @@ export function Dashboard({ states, selectedKey, onSelect }: DashboardProps) {
           </div>
         </section>
 
-        <section className="clients-section" aria-labelledby="checks-title">
+        <section className="clients-section sensors-section" aria-labelledby="checks-title">
           <div className="panel-heading">
             <div><p className="section-kicker">active checks</p><h2 id="checks-title">sensors</h2></div>
-            <span className="panel-meta">{checks.length} configured</span>
+            <span className="panel-meta">{checks.length} saved</span>
           </div>
           <form className="monitor-form" onSubmit={addMonitor}>
             <label><span>device</span><select name="device_id" aria-label="device" required><option value="">choose device</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}</select></label>

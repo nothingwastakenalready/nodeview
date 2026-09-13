@@ -119,13 +119,18 @@ body::before { opacity: .16; background-image: radial-gradient(#9fb9c7 .7px, tra
 
 .clients-section { order: 5; margin-top: 12px; padding: 22px 0; color: var(--raff-cloud); }
 .clients-section .section-kicker, .clients-section .panel-meta { color: #8495a3; }
-.monitor-form { display: grid; grid-template-columns: minmax(160px, .95fr) minmax(170px, 1.1fr) minmax(105px, .55fr) minmax(220px, 1.25fr) minmax(160px, .9fr) minmax(78px, .42fr) minmax(92px, .48fr) auto; gap: 9px; align-items: end; margin: 8px 0 20px; padding: 14px 0 18px; border-top: 1px solid rgb(73 98 115 / 42%); border-bottom: 1px solid rgb(73 98 115 / 42%); }
-.monitor-form label { min-width: 0; display: grid; gap: 6px; }
-.monitor-form label > span { color: #627582; font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
-.monitor-form input, .monitor-form select { width: 100%; min-width: 0; height: 38px; border: 1px solid rgb(73 98 115 / 62%); border-radius: 999px; background: rgb(8 13 19 / 44%); color: #dfe9ed; outline: none; padding: 0 13px; font: 400 11px/1 "Space Mono", ui-monospace, monospace; box-shadow: inset 0 0 18px rgb(111 149 196 / 5%); }
-.monitor-form select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, #8495a3 50%), linear-gradient(135deg, #8495a3 50%, transparent 50%); background-position: calc(100% - 16px) 16px, calc(100% - 11px) 16px; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 30px; }
+.sensors-section { padding: 26px 0 30px; }
+.sensors-section .panel-heading { margin-bottom: 18px; }
+.sensors-section .panel-meta { padding: 6px 11px; border: 1px solid rgb(73 98 115 / 42%); border-radius: 999px; background: rgb(8 13 19 / 36%); }
+.monitor-form { display: grid; grid-template-columns: minmax(150px, .95fr) minmax(170px, 1.1fr) minmax(105px, .55fr) minmax(220px, 1.25fr) minmax(150px, .9fr) minmax(78px, .42fr) minmax(92px, .48fr) auto; gap: 11px; align-items: end; margin: 8px 0 22px; padding: 18px; border: 1px solid rgb(73 98 115 / 34%); border-radius: 22px; background: linear-gradient(135deg, rgb(8 13 19 / 58%), rgb(8 13 19 / 24%)); box-shadow: inset 0 1px 0 rgb(238 242 243 / 5%), 0 18px 48px rgb(2 4 6 / 18%); backdrop-filter: blur(8px); }
+.monitor-form label { min-width: 0; display: grid; gap: 7px; }
+.monitor-form label > span { color: #6e818d; font-size: 8px; letter-spacing: .14em; text-transform: uppercase; }
+.monitor-form input, .monitor-form select { width: 100%; min-width: 0; height: 40px; -webkit-appearance: none; appearance: none; border: 1px solid rgb(73 98 115 / 58%); border-radius: 999px; background-color: rgb(3 7 11 / 72%); color: #dfe9ed; outline: none; padding: 0 14px; font: 400 11px/1 "Space Mono", ui-monospace, monospace; box-shadow: inset 0 0 18px rgb(111 149 196 / 6%); }
+.monitor-form input[type="number"] { -moz-appearance: textfield; }
+.monitor-form input[type="number"]::-webkit-outer-spin-button, .monitor-form input[type="number"]::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; }
+.monitor-form select { background-image: linear-gradient(45deg, transparent 50%, #8495a3 50%), linear-gradient(135deg, #8495a3 50%, transparent 50%); background-position: calc(100% - 16px) 17px, calc(100% - 11px) 17px; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 30px; }
 .monitor-form input::placeholder { color: #6e818d; opacity: 1; }
-.monitor-form input:focus, .monitor-form select:focus { border-color: #9dcfe2; box-shadow: 0 0 0 1px rgb(157 207 226 / 40%), 0 0 22px rgb(157 207 226 / 11%); }
+.monitor-form input:focus, .monitor-form select:focus { border-color: #9dcfe2; background-color: rgb(5 11 17 / 86%); box-shadow: 0 0 0 1px rgb(157 207 226 / 36%), 0 0 22px rgb(157 207 226 / 12%); }
 .monitor-form option { background: #020406; color: #edf3f5; }
 .monitor-form-submit { align-self: end; display: inline-flex; align-items: center; gap: 9px; height: 38px; border: 0; background: transparent; color: #edf3f5; cursor: pointer; font: 400 10px/1 "Space Mono", monospace; letter-spacing: .04em; white-space: nowrap; }
 .monitor-form-submit span { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 1px solid #6f946f; border-radius: 50%; color: #6f946f; font-size: 20px; line-height: 1; transition: background 160ms ease, color 160ms ease, border-color 160ms ease; }
