@@ -8,19 +8,37 @@ there are obviously a hundred tools that do this already. i didn't want any of t
 
 ## right now
 
-- yaml in
+- local account login
+- database-backed devices and sensors
 - http + tcp checks
 - response time
-- cli out
+- latency, uptime and downtime from stored history
 - http api
 - always-on scheduler
 - current state with `pending / up / warning / critical / unknown`
 - durable sqlite measurement history
 - bounded per-service history api with utc time ranges
 - failure/recovery thresholds so one bad sample does not immediately become the apocalypse
-- first browser ui with a compact hexagon overview and current latency
+- browser ui with a starfield/constellation overview
 - docker because leaving a terminal open forever is stupid
 - local Mailpit inbox for safe email development
+
+## if you found this
+
+If you want to make it run without knowing the project already, start here:
+
+```text
+docs/getting-started.md
+```
+
+That guide explains Docker, `.env`, the first account, Mailpit and the first
+sensor without assuming you know this repo already.
+
+Configuration reference:
+
+```text
+docs/configuration.md
+```
 
 ## run it locally
 
@@ -29,6 +47,7 @@ You only need Git and Docker Desktop (or Docker Engine + Compose).
 ```bash
 git clone https://github.com/nothingwastakenalready/raffael.git
 cd raffael
+cp .env.example .env
 cp services.example.yaml services.yaml
 docker compose up -d --build
 ```
@@ -49,9 +68,24 @@ Mailpit captures messages locally and does not deliver them to real recipients.
 See `docs/architecture/email-delivery.md` for Proton SMTP configuration and
 the planned confirmation/newsletter flows.
 
-The same process serves the API, scheduler and built UI. Compose still binds only to localhost by default. There is no auth yet, so changing that to a public bind would be a fairly creative decision.
+The same process serves the API, scheduler and built UI. Compose binds only to
+localhost by default. Keep it that way unless you deliberately want LAN access.
+For LAN access, edit `.env` and set the bind addresses and public URL to the
+host's LAN IP:
 
-Change `services.yaml` to point at things you actually run, then restart:
+```env
+RAFFAEL_BIND_ADDRESS=192.168.1.50
+RAFFAEL_MAILPIT_BIND_ADDRESS=192.168.1.50
+RAFFAEL_PUBLIC_URL=http://192.168.1.50:8080
+```
+
+Do not expose Raffael directly to the public internet.
+
+Create the first account in the browser. If you need password reset or account
+email, open Mailpit and use the newest message.
+
+Add real sensors from the dashboard, or change `services.yaml` before the first
+database import, then restart:
 
 ```bash
 docker compose restart
@@ -61,13 +95,19 @@ API is still there:
 
 ```text
 GET  /health
-GET  /services
+GET  /ready
 GET  /state
-GET  /history/{service_name}
-POST /check
+GET  /checks
+POST /checks
+PATCH /checks/{check_id}
+DELETE /checks/{check_id}
+GET  /checks/{check_id}/history
+POST /checks/{check_id}/run
 ```
 
-`/services` runs the configured checks on request. `/state` shows what the scheduler currently believes. `/history/{service_name}` returns stored scheduled measurements and accepts optional `from`, `to` and `limit` query parameters. `/check` does one ad-hoc http/tcp check without changing config.
+`/ready` checks database and scheduler readiness. `/state` shows the current
+workspace-filtered monitoring state. `/checks` manages stored sensors. The old
+raw `/check` endpoint is intentionally gone for normal use.
 
 config is still deliberately boring:
 

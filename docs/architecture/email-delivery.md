@@ -14,12 +14,21 @@ slice.
 Compose starts Mailpit next to Raffael:
 
 ```text
-SMTP: 127.0.0.1:1025
+SMTP inside Docker: mailpit:1025
 Inbox: http://127.0.0.1:8025
 ```
 
 Mailpit accepts messages without delivering them to real recipients. This keeps
 registration tests and UI work safe without a domain or external credentials.
+
+For LAN access, set `RAFFAEL_MAILPIT_BIND_ADDRESS` in `.env` to the Docker host's
+LAN IP. The app's email links should use the same address through
+`RAFFAEL_PUBLIC_URL`.
+
+```env
+RAFFAEL_MAILPIT_BIND_ADDRESS=192.168.1.50
+RAFFAEL_PUBLIC_URL=http://192.168.1.50:8080
+```
 
 ### production
 
