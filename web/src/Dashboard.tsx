@@ -593,14 +593,14 @@ export function Dashboard({ states, selectedKey, onSelect }: DashboardProps) {
             <span className="panel-meta">{checks.length} configured</span>
           </div>
           <form className="monitor-form" onSubmit={addMonitor}>
-            <label><span className="sr-only">device</span><select name="device_id" aria-label="device" required><option value="">choose device</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}</select></label>
-            <label><span className="sr-only">name</span><input name="name" aria-label="sensor name" placeholder="sensor name" required /></label>
-            <label><span className="sr-only">type</span><select name="type" aria-label="type" defaultValue="http"><option value="http">http</option><option value="tcp">tcp</option><option value="tcp_auto">auto tcp</option></select></label>
-            <label><span className="sr-only">url</span><input name="url" aria-label="http url" placeholder="https://host/health" /></label>
-            <label><span className="sr-only">host</span><input name="host" aria-label="tcp host" placeholder="tcp host" /></label>
-            <label><span className="sr-only">port</span><input name="port" aria-label="tcp port" type="number" min="1" max="65535" placeholder="port" /></label>
-            <label><span className="sr-only">interval</span><input name="interval" aria-label="interval seconds" type="number" min="1" defaultValue="30" /></label>
-            <button className="client-dialog-submit" type="submit"><span>+</span> add sensor</button>
+            <label><span>device</span><select name="device_id" aria-label="device" required><option value="">choose device</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}</select></label>
+            <label><span>name</span><input name="name" aria-label="sensor name" placeholder="sensor name" required /></label>
+            <label><span>type</span><select name="type" aria-label="type" defaultValue="http"><option value="http">http</option><option value="tcp">tcp</option><option value="tcp_auto">auto tcp</option></select></label>
+            <label className="monitor-form-wide"><span>http</span><input name="url" aria-label="http url" placeholder="https://host/health" /></label>
+            <label><span>host</span><input name="host" aria-label="tcp host" placeholder="tcp host" /></label>
+            <label><span>port</span><input name="port" aria-label="tcp port" type="number" min="1" max="65535" placeholder="port" /></label>
+            <label><span>interval</span><input name="interval" aria-label="interval seconds" type="number" min="1" defaultValue="30" /></label>
+            <button className="monitor-form-submit" type="submit" aria-label="add sensor"><span>+</span><strong>add sensor</strong></button>
           </form>
           {checkMessage ? <p className="client-dialog-message" role="status">{checkMessage}</p> : null}
           {checks.length === 0 ? <div className="clients-empty">no sensors saved yet.</div> : (
